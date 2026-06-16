@@ -13,6 +13,7 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'Gnaver',
   slug: 'gnaver',
+  owner: 'ariomoniri',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -78,7 +79,7 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
   extra: {
-    eas: { projectId: process.env.EAS_PROJECT_ID ?? '' },
+    eas: { projectId: process.env.EAS_PROJECT_ID ?? 'd69605ff-581a-4d5b-b357-f97e2e853212' },
   },
 };
 
