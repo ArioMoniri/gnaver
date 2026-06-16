@@ -239,12 +239,56 @@ export interface DayWeather {
 // Optimizer output
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Public-transit vehicle classes we render distinct icons/labels for. */
+export type TransitVehicle =
+  | 'bus'
+  | 'subway'
+  | 'tram'
+  | 'rail'
+  | 'ferry'
+  | 'cable'
+  | 'funicular'
+  | 'other';
+
+/**
+ * One public-transport hop within a leg (from Google Directions transit_details).
+ * Note: station *exit numbers* and *platform numbers* are not exposed by the
+ * Directions API, so they are intentionally absent here.
+ */
+export interface TransitStep {
+  vehicle: TransitVehicle;
+  /** Short line label, e.g. "M1", "14", "Bakerloo". */
+  line: string;
+  /** Full line name when the agency provides one, e.g. "Metro Line 1". */
+  lineName?: string;
+  /** Agency line colour as a hex string, e.g. "#FFCD00". */
+  color?: string;
+  /** Readable text colour to draw on top of `color`. */
+  textColor?: string;
+  /** Board at this station/stop. */
+  from: string;
+  /** Alight at this station/stop. */
+  to: string;
+  /** Number of stops ridden on this line. */
+  numStops?: number;
+  /** Direction / headsign, e.g. "towards Château de Vincennes". */
+  headsign?: string;
+  /** Scheduled departure clock string, e.g. "09:12". */
+  departure?: string;
+}
+
 export interface RouteLeg {
   mode: TransportMode;
   distanceMeters: number;
   durationMinutes: number;
   /** Optional decoded path for drawing on the map. */
   polyline?: LatLng[];
+  /**
+   * Per-line transit detail when `mode` is transit/mixed (lines, colours,
+   * board/alight stations, stop counts). Populated by a display-only Directions
+   * enrichment pass; absent when offline or for walk/drive/bike legs.
+   */
+  transit?: TransitStep[];
 }
 
 export interface ScheduledStop {
@@ -272,6 +316,12 @@ export interface DayPlan {
   stops: ScheduledStop[];
   startLocation?: LatLng;
   endLocation?: LatLng;
+  /** Human label for where the day starts (e.g. "Hotel Lutetia", "Trip base"). */
+  startName?: string;
+  /** Human label for where the day ends. */
+  endName?: string;
+  /** Travel from the last stop back to the day's end point, when one is set. */
+  endLeg?: RouteLeg;
   totalDistanceMeters: number;
   totalTravelMinutes: number;
   totalCost: { amount: number; currency: CurrencyCode; hasUnknown: boolean };

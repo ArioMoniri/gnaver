@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
-import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan, type LatLng } from '@/core';
+import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan, type LatLng, type RouteLeg } from '@/core';
 import { getLocalDishes } from '@/data';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
@@ -346,19 +346,32 @@ export default function PlanScreen() {
                     Nothing scheduled for this day.
                   </Text>
                 ) : (
-                  day.stops.map((stop, i) => (
-                    <TimelineStop
-                      key={`${stop.place.id}-${i}`}
-                      stop={stop}
-                      index={i}
-                      currency={currency}
-                      isLast={i === day.stops.length - 1}
-                      onMoveUp={() => onMoveStop(i, i - 1)}
-                      onMoveDown={() => onMoveStop(i, i + 1)}
-                      canMoveUp={i > 0}
-                      canMoveDown={i < day.stops.length - 1}
-                    />
-                  ))
+                  <>
+                    {startPin ? (
+                      <TerminalRow kind="start" name={day.window.startName ?? 'Start'} theme={theme} />
+                    ) : null}
+                    {day.stops.map((stop, i) => (
+                      <TimelineStop
+                        key={`${stop.place.id}-${i}`}
+                        stop={stop}
+                        index={i}
+                        currency={currency}
+                        isLast={i === day.stops.length - 1 && !endPin}
+                        onMoveUp={() => onMoveStop(i, i - 1)}
+                        onMoveDown={() => onMoveStop(i, i + 1)}
+                        canMoveUp={i > 0}
+                        canMoveDown={i < day.stops.length - 1}
+                      />
+                    ))}
+                    {endPin ? (
+                      <TerminalRow
+                        kind="end"
+                        name={day.window.endName ?? 'End'}
+                        leg={day.endLeg}
+                        theme={theme}
+                      />
+                    ) : null}
+                  </>
                 )}
               </View>
 
@@ -449,6 +462,53 @@ export default function PlanScreen() {
           </View>
         </GlassSurface>
       </Animated.View>
+    </View>
+  );
+}
+
+/** Origin / destination row on the timeline — where the day starts and ends. */
+function TerminalRow({
+  kind,
+  name,
+  leg,
+  theme,
+}: {
+  kind: 'start' | 'end';
+  name: string;
+  leg?: RouteLeg;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const isStart = kind === 'start';
+  const color = isStart ? theme.colors.accent : theme.colors.textSecondary;
+  return (
+    <View style={styles.terminalRow}>
+      <View style={styles.terminalRail}>
+        {!isStart ? <View style={[styles.terminalConnectorTop, { backgroundColor: theme.colors.border }]} /> : null}
+        <View style={[styles.terminalNode, { backgroundColor: color, borderColor: theme.colors.surface }]}>
+          <IconSymbol
+            name={isStart ? 'location.fill' : 'flag.checkered'}
+            size={12}
+            color="#FFFFFF"
+            fallbackGlyph={isStart ? '◉' : '⚑'}
+          />
+        </View>
+        {isStart ? <View style={[styles.terminalConnector, { backgroundColor: theme.colors.border }]} /> : null}
+      </View>
+      <View style={styles.terminalContent}>
+        {!isStart && leg ? (
+          <View style={[styles.terminalLegChip, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border, borderRadius: theme.radius.pill }]}>
+            <Text variant="caption" tone="secondary">
+              ↩ {formatDuration(leg.durationMinutes)} · {formatDistance(leg.distanceMeters)} back
+            </Text>
+          </View>
+        ) : null}
+        <Text variant="caption" tone="tertiary" weight="700" style={styles.terminalLabel}>
+          {isStart ? 'START' : 'END'}
+        </Text>
+        <Text variant="subhead" weight="600" tone="onGlass" numberOfLines={1}>
+          {name}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -599,6 +659,51 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  terminalRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  terminalRail: {
+    width: 28,
+    alignItems: 'center',
+  },
+  terminalNode: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    marginTop: 2,
+  },
+  terminalConnector: {
+    width: 2,
+    height: 18,
+    marginTop: 4,
+    borderRadius: 1,
+  },
+  terminalConnectorTop: {
+    width: 2,
+    height: 18,
+    marginBottom: 4,
+    borderRadius: 1,
+  },
+  terminalContent: {
+    flex: 1,
+    paddingBottom: 12,
+    justifyContent: 'center',
+  },
+  terminalLegChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
+  },
+  terminalLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   toast: {
     position: 'absolute',

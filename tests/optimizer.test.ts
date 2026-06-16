@@ -138,6 +138,33 @@ describe('optimizeItinerary', () => {
     expect(allIds).not.toContain('closed');
   });
 
+  test('ends the day at the chosen end point with an explicit return leg in the totals', () => {
+    const END = { lat: 38.705, lng: -9.16 };
+    const trip = makeTrip({
+      days: [
+        {
+          date: '2026-06-17',
+          startMinutes: 9 * 60,
+          endMinutes: 19 * 60,
+          startLocation: HOTEL,
+          startName: 'Hotel',
+          endLocation: END,
+          endName: 'Apartment',
+        },
+      ],
+    });
+    const day = optimizeItinerary({ trip }).days[0];
+    expect(day.stops.length).toBeGreaterThan(0);
+    // The return-to-end leg is present and labelled for the UI.
+    expect(day.endLeg).toBeDefined();
+    expect(day.endLeg!.durationMinutes).toBeGreaterThan(0);
+    expect(day.startName).toBe('Hotel');
+    expect(day.endName).toBe('Apartment');
+    // Day totals must account for the trip back to the end point.
+    const stopTravel = day.stops.reduce((s, st) => s + (st.legToHere?.durationMinutes ?? 0), 0);
+    expect(day.totalTravelMinutes).toBe(stopTravel + day.endLeg!.durationMinutes);
+  });
+
   test('must-see places are prioritised', () => {
     const result = optimizeItinerary({ trip: makeTrip() });
     const allIds = result.days.flatMap((d) => d.stops.map((s) => s.place.id));

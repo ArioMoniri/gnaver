@@ -87,10 +87,16 @@ export function TripMap({ stops, center, startPin, endPin, fitKey, style }: Trip
   }, [points, start, end]);
   const camera = useMemo(() => cameraFor(fitPoints, center), [fitPoints, center]);
 
-  const routeCoords = useMemo(
-    () => points.map((p) => ({ latitude: p.lat, longitude: p.lng })),
-    [points],
-  );
+  // Draw the line through the day's start and end so the route visibly begins
+  // and finishes at the chosen points (hotel → stops → hotel), not just between
+  // the numbered stops.
+  const routeCoords = useMemo(() => {
+    const seq: LatLng[] = [];
+    if (start) seq.push({ lat: start.lat, lng: start.lng });
+    for (const p of points) seq.push(p);
+    if (end) seq.push({ lat: end.lat, lng: end.lng });
+    return seq.map((p) => ({ latitude: p.lat, longitude: p.lng }));
+  }, [points, start, end]);
 
   // ── iOS: AppleMaps ─────────────────────────────────────────────────────────
   if (Platform.OS === 'ios') {

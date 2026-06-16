@@ -379,9 +379,20 @@ function toScheduledStop(b: BuiltStop): ScheduledStop {
 
 function assembleDay(builtStops: BuiltStop[], ctx: DayContext, trip: Trip): DayPlan {
   const stops = builtStops.map(toScheduledStop);
-  const totalDistanceMeters = builtStops.reduce((s, b) => s + b.leg.distanceMeters, 0);
-  const totalTravelMinutes = builtStops.reduce((s, b) => s + b.leg.durationMinutes, 0);
+  let totalDistanceMeters = builtStops.reduce((s, b) => s + b.leg.distanceMeters, 0);
+  let totalTravelMinutes = builtStops.reduce((s, b) => s + b.leg.durationMinutes, 0);
   const cost = sumEntryCost(builtStops.map((b) => b.place), trip.currency);
+
+  // Real "return to your end point" leg: the optimizer only used endLocation as a
+  // feasibility constraint; here we make the trip back explicit so it shows on the
+  // map + timeline and counts toward the day's distance/time totals.
+  let endLeg: RouteLeg | undefined;
+  if (ctx.window.endLocation && builtStops.length > 0) {
+    const last = builtStops[builtStops.length - 1].place.location;
+    endLeg = ctx.travel(last, ctx.window.endLocation, ctx.prefs.transport);
+    totalDistanceMeters += endLeg.distanceMeters;
+    totalTravelMinutes += endLeg.durationMinutes;
+  }
 
   const points: LatLng[] = [];
   if (ctx.window.startLocation) points.push(ctx.window.startLocation);
@@ -399,6 +410,9 @@ function assembleDay(builtStops: BuiltStop[], ctx: DayContext, trip: Trip): DayP
     stops,
     startLocation: ctx.window.startLocation,
     endLocation: ctx.window.endLocation,
+    startName: ctx.window.startName,
+    endName: ctx.window.endName,
+    endLeg,
     totalDistanceMeters,
     totalTravelMinutes,
     totalCost: cost,
@@ -552,10 +566,21 @@ export function resequenceDay(
     time = depart;
   }
 
+  // Explicit return leg to the day's end point (mirrors assembleDay), so a
+  // manually-reordered day still starts/ends where the traveller chose.
+  let endLeg: RouteLeg | undefined;
+  if (window.endLocation && orderedPlaces.length > 0) {
+    const last = orderedPlaces[orderedPlaces.length - 1].location;
+    endLeg = travel(last, window.endLocation, prefs.transport);
+  }
+
   const points: LatLng[] = [];
   if (window.startLocation) points.push(window.startLocation);
   for (const p of orderedPlaces) points.push(p.location);
   if (window.endLocation) points.push(window.endLocation);
+
+  const stopDistance = stops.reduce((s, st) => s + (st.legToHere?.distanceMeters ?? 0), 0);
+  const stopTravel = stops.reduce((s, st) => s + (st.legToHere?.durationMinutes ?? 0), 0);
 
   return {
     date: window.date,
@@ -563,8 +588,11 @@ export function resequenceDay(
     stops,
     startLocation: window.startLocation,
     endLocation: window.endLocation,
-    totalDistanceMeters: stops.reduce((s, st) => s + (st.legToHere?.distanceMeters ?? 0), 0),
-    totalTravelMinutes: stops.reduce((s, st) => s + (st.legToHere?.durationMinutes ?? 0), 0),
+    startName: window.startName,
+    endName: window.endName,
+    endLeg,
+    totalDistanceMeters: stopDistance + (endLeg?.distanceMeters ?? 0),
+    totalTravelMinutes: stopTravel + (endLeg?.durationMinutes ?? 0),
     totalCost: sumEntryCost(orderedPlaces, currency),
     unscheduled: [],
     weather: opts?.weather,
