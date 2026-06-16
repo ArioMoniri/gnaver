@@ -54,7 +54,7 @@ export function TimelineStop({ stop, index, currency, isLast = false }: Timeline
       {/* Content */}
       <View style={styles.content}>
         {leg ? (
-          <View style={[styles.legChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.pill }]}>
+          <View style={[styles.legChip, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border, borderRadius: theme.radius.pill }]}>
             <Text variant="caption" tone="secondary">
               {transportMeta(leg.mode).emoji} {formatDuration(leg.durationMinutes)} · {formatDistance(leg.distanceMeters)}
             </Text>
@@ -77,7 +77,7 @@ export function TimelineStop({ stop, index, currency, isLast = false }: Timeline
             ) : null}
           </View>
 
-          <Text variant="headline" style={{ marginTop: 4 }} numberOfLines={2}>
+          <Text variant="headline" tone="onGlass" style={{ marginTop: 4 }} numberOfLines={2}>
             {place.name}
           </Text>
 
@@ -87,8 +87,8 @@ export function TimelineStop({ stop, index, currency, isLast = false }: Timeline
           </View>
 
           <View style={styles.factsRow}>
-            <Fact icon="eurosign.circle" glyph="€" color={theme.colors.textSecondary} text={priceLabel} theme={theme} />
-            <Fact icon="hourglass" glyph="⏳" color={theme.colors.textSecondary} text={formatDuration(place.dwellMinutes)} theme={theme} />
+            <Fact icon="eurosign.circle" glyph="€" color={theme.colors.onGlassSecondary} text={priceLabel} theme={theme} />
+            <Fact icon="hourglass" glyph="⏳" color={theme.colors.onGlassSecondary} text={formatDuration(place.dwellMinutes)} theme={theme} />
           </View>
 
           {payments && payments !== 'Unknown' ? (

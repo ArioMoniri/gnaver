@@ -153,7 +153,7 @@ export function GlassSurface({
         <BlurView
           tint={blurTint(theme.scheme, variant)}
           intensity={blurIntensity(variant)}
-          experimentalBlurMethod="dimezisBlurView"
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
           style={[
             contentBox,
             styles.border,

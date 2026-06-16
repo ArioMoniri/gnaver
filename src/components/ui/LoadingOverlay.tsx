@@ -34,7 +34,7 @@ export function LoadingOverlay({ visible, title = 'Optimising your trip', status
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
-      <View style={[styles.scrim, { backgroundColor: theme.scheme === 'dark' ? 'rgba(0,0,0,0.55)' : 'rgba(11,16,20,0.34)' }]}>
+      <View style={[styles.scrim, { backgroundColor: theme.colors.scrim }]}>
         <Animated.View
           style={{
             opacity: anim,

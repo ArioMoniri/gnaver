@@ -234,7 +234,7 @@ export default function NewTripScreen() {
               <View
                 style={[
                   styles.inputRow,
-                  { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md },
                 ]}
               >
                 <IconSymbol name="link" size={16} color={theme.colors.textTertiary} />

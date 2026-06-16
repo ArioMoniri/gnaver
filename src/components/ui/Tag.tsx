@@ -40,7 +40,8 @@ export function Tag({ label, tone = 'neutral', icon, iconFallback, emoji, glass 
       case 'danger':
         return { bg: `${theme.colors.danger}22`, fg: theme.colors.danger };
       default:
-        return { bg: theme.colors.background, fg: theme.colors.textSecondary };
+        // surfaceElevated (not background) so neutral tags read on a same-color sheet.
+        return { bg: theme.colors.surfaceElevated, fg: theme.colors.textSecondary };
     }
   };
 
