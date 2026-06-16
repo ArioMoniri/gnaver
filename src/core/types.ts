@@ -299,6 +299,8 @@ export interface PlaceSearchParams {
   interests: Interest[];
   radiusMeters?: number;
   limit?: number;
+  /** Destination currency so live price levels render correctly (not USD). */
+  currency?: CurrencyCode;
 }
 
 export interface FoodSearchParams {
@@ -306,10 +308,14 @@ export interface FoodSearchParams {
   budget?: FoodBudget;
   cuisine?: string[];
   dietary?: string[];
+  /** Include quick / fast-food options (e.g. a 15-min break) alongside sit-downs. */
+  includeQuick?: boolean;
   /** Minutes from midnight the stop is needed (for open-now filtering). */
   atMinutes?: number;
   date?: string;
   limit?: number;
+  /** Destination currency so food price levels render correctly. */
+  currency?: CurrencyCode;
 }
 
 export interface ParsedList {

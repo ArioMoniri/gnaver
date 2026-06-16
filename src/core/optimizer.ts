@@ -19,6 +19,7 @@ import { buildDirectionsUrl } from './googleMaps';
 import { sumEntryCost } from './currency';
 import { formatMinutes } from './time';
 import type {
+  CurrencyCode,
   DayPlan,
   DayWeather,
   DayWindow,
@@ -145,7 +146,8 @@ function tryStop(
     if (vis.departMinutes + toEnd.durationMinutes > ctx.window.endMinutes) return null;
   }
 
-  const wx = weatherImpact(place, ctx.weather, ctx.prefs);
+  // Evaluate weather at the hour the visit actually happens (time-of-day aware).
+  const wx = weatherImpact(place, ctx.weather, ctx.prefs, Math.floor(vis.entryMinutes / 60));
   const warnings = [...wx.warnings];
 
   // "Closing soon" nudge if we leave within 20 min of a closing edge.
@@ -396,5 +398,86 @@ export function optimizeItinerary(input: OptimizeInput): ItineraryResult {
     unscheduled: [...remaining.values()],
     generatedAt: new Date().toISOString(),
     score: Math.round(totalScore),
+  };
+}
+
+/**
+ * Re-time a single day for a user-chosen stop order (manual drag-to-reorder).
+ * Unlike the optimizer, this NEVER drops or reorders — it honours the given
+ * sequence exactly, recomputes arrival/departure (inserting a wait for opening
+ * hours), and flags any stop that ends up closed or past the day window. This
+ * is what lets the traveller override the "optimal" order and still get a
+ * coherent, re-timed plan.
+ */
+export function resequenceDay(
+  orderedPlaces: Place[],
+  window: DayWindow,
+  prefs: TripPreferences,
+  opts?: { travel?: TravelFn; weather?: DayWeather; currency?: CurrencyCode },
+): DayPlan {
+  const travel = opts?.travel ?? estimateLeg;
+  const currency = opts?.currency ?? 'EUR';
+  const stops: ScheduledStop[] = [];
+  let pos: LatLng | null = window.startLocation ?? null;
+  let time = window.startMinutes;
+
+  for (const place of orderedPlaces) {
+    const leg: RouteLeg = pos
+      ? travel(pos, place.location, prefs.transport)
+      : { mode: 'walk', distanceMeters: 0, durationMinutes: 0 };
+    const arrival = time + leg.durationMinutes;
+    const dwell = place.isFood
+      ? place.dwellMinutes
+      : Math.round(place.dwellMinutes * PACE_DWELL_FACTOR[prefs.pace]);
+    const vis = evaluateVisit(place.openingHours, window.date, arrival, dwell, 24 * 60);
+    const entry = vis.feasible ? vis.entryMinutes : arrival;
+    const wait = vis.feasible ? vis.waitMinutes : 0;
+    const depart = entry + dwell;
+
+    const warnings: string[] = [];
+    if (!vis.feasible) {
+      warnings.push(
+        vis.reason === 'closed-for-day'
+          ? 'Closed on this date'
+          : vis.reason === 'closes-during-visit'
+            ? 'Closes during this visit'
+            : 'Tight — may be closed at this time',
+      );
+    }
+    if (depart > window.endMinutes) warnings.push('Runs past your day window');
+    warnings.push(...weatherImpact(place, opts?.weather, prefs, Math.floor(entry / 60)).warnings);
+
+    stops.push({
+      place,
+      arrivalMinutes: entry,
+      departureMinutes: depart,
+      arrival: formatMinutes(entry),
+      departure: formatMinutes(depart),
+      legToHere: leg.distanceMeters === 0 && leg.durationMinutes === 0 ? undefined : leg,
+      waitMinutes: wait || undefined,
+      warnings: warnings.length ? warnings : undefined,
+      isFood: place.isFood || undefined,
+    });
+    pos = place.location;
+    time = depart;
+  }
+
+  const points: LatLng[] = [];
+  if (window.startLocation) points.push(window.startLocation);
+  for (const p of orderedPlaces) points.push(p.location);
+  if (window.endLocation) points.push(window.endLocation);
+
+  return {
+    date: window.date,
+    window,
+    stops,
+    startLocation: window.startLocation,
+    endLocation: window.endLocation,
+    totalDistanceMeters: stops.reduce((s, st) => s + (st.legToHere?.distanceMeters ?? 0), 0),
+    totalTravelMinutes: stops.reduce((s, st) => s + (st.legToHere?.durationMinutes ?? 0), 0),
+    totalCost: sumEntryCost(orderedPlaces, currency),
+    unscheduled: [],
+    weather: opts?.weather,
+    googleMapsUrl: buildDirectionsUrl(points, prefs.transport),
   };
 }

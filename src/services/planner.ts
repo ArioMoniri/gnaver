@@ -115,7 +115,9 @@ export async function generateItinerary(
             budget: trip.preferences.foodBudget,
             cuisine: trip.preferences.cuisinePrefs,
             dietary: trip.preferences.dietary,
+            includeQuick: trip.preferences.foodBudget === 'cheap',
             date: day.date,
+            currency: trip.currency,
             limit: 20,
           });
 

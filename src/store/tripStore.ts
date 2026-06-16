@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import {
   centroid,
   dateRange,
+  resequenceDay,
   type CurrencyCode,
   type DayWindow,
   type ItineraryResult,
@@ -24,7 +25,7 @@ import {
   getSampleSharedList,
   listCities,
 } from '@/data';
-import { generateItinerary, placesProvider } from '@/services';
+import { features, generateItinerary, placesProvider } from '@/services';
 
 export type TripSource = 'city' | 'link';
 export type TripStatus =
@@ -94,12 +95,17 @@ interface TripState {
 
   // mutations
   startFromCity: (cityId: string) => Promise<void>;
+  /** Resolve and load ANY city by free-text name (live geocode + places when keyed). */
+  startFromCityQuery: (query: string) => Promise<void>;
   startFromLink: (url: string) => Promise<void>;
   loadSampleList: () => void;
   toggleSelect: (id: string) => void;
   setAllSelected: (value: boolean) => void;
+  setMustSee: (id: string, value: boolean) => void;
   addCustomPlace: (place: Place) => void;
   removeCandidate: (id: string) => void;
+  /** Manually move a stop within a day; re-times the day without re-optimizing. */
+  reorderStops: (dayIndex: number, fromIndex: number, toIndex: number) => void;
   setDayCount: (n: number) => void;
   setHours: (startMinutes: number, endMinutes: number) => void;
   setStartDate: (iso: string) => void;
@@ -170,20 +176,78 @@ export const useTrip = create<TripState>()((set, get) => ({
 
   startFromCity: async (cityId) => {
     const meta = listCities().find((c) => c.id === cityId);
+    if (!meta) return;
+    // With a live key, route even the suggested cities through live data so the
+    // app is never limited to the bundled datasets ("nothing hardcoded").
+    if (features.livePlaces) {
+      await get().startFromCityQuery(meta.name);
+      return;
+    }
     const places = getCityPlaces(cityId);
     set({
       ...initial,
       startDate: todayLocal().date,
       source: 'city',
       cityId,
-      title: meta?.name ?? 'My Trip',
-      currency: meta?.currency ?? 'EUR',
-      center: meta?.center,
+      title: meta.name,
+      currency: meta.currency,
+      center: meta.center,
       candidates: places,
       selectedIds: allSelected(places),
       preferences: { ...get().preferences },
       status: 'candidates',
     });
+  },
+
+  startFromCityQuery: async (query) => {
+    const q = query.trim();
+    if (!q) return;
+    set({ status: 'loadingCandidates', error: undefined });
+    try {
+      const resolved = await placesProvider.resolveCity(q);
+      if (!resolved) {
+        set({
+          status: 'error',
+          error: features.livePlaces
+            ? `Couldn't find "${q}". Try a different spelling.`
+            : `"${q}" isn't in the offline sample set. Add a Google Maps key (.env) to search any city.`,
+        });
+        return;
+      }
+      let candidates = await placesProvider.search({
+        center: resolved.center,
+        interests: get().preferences.interests,
+        currency: resolved.currency,
+        limit: 30,
+      });
+      // Offline fallback to curated data when the city is one we ship.
+      if (candidates.length === 0) {
+        const cid = cityIdForCenter(resolved.center);
+        if (cid) candidates = getCityPlaces(cid);
+      }
+      if (candidates.length === 0) {
+        set({
+          status: 'error',
+          error: `No places found for ${resolved.city}. Add a Google Maps key to search live data.`,
+        });
+        return;
+      }
+      set({
+        ...initial,
+        startDate: todayLocal().date,
+        source: 'city',
+        cityId: cityIdForCenter(resolved.center),
+        title: resolved.city,
+        currency: resolved.currency || 'EUR',
+        center: resolved.center,
+        candidates,
+        selectedIds: allSelected(candidates),
+        preferences: { ...get().preferences },
+        status: 'candidates',
+      });
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : 'City search failed' });
+    }
   },
 
   startFromLink: async (url) => {
@@ -238,6 +302,40 @@ export const useTrip = create<TripState>()((set, get) => ({
 
   setAllSelected: (value) =>
     set((s) => ({ selectedIds: Object.fromEntries(s.candidates.map((p) => [p.id, value])) })),
+
+  setMustSee: (id, value) =>
+    set((s) => ({
+      candidates: s.candidates.map((p) => (p.id === id ? { ...p, mustSee: value } : p)),
+    })),
+
+  reorderStops: (dayIndex, fromIndex, toIndex) => {
+    const s = get();
+    const itin = s.itinerary;
+    const day = itin?.days[dayIndex];
+    if (!itin || !day) return;
+    const order = day.stops.map((st) => st.place);
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= order.length ||
+      toIndex >= order.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    const newDay = resequenceDay(order, day.window, s.preferences, {
+      weather: day.weather,
+      currency: s.currency,
+    });
+    set({
+      itinerary: {
+        ...itin,
+        days: itin.days.map((d, i) => (i === dayIndex ? newDay : d)),
+      },
+    });
+  },
 
   addCustomPlace: (place) =>
     set((s) => ({

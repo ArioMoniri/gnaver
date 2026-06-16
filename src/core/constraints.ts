@@ -134,32 +134,42 @@ export interface WeatherImpact {
 const BAD_CONDITIONS = new Set(['rain', 'snow', 'storm']);
 
 /**
- * How much the weather should push the optimizer toward/away from a place on a
- * given day. Indoor places become *more* attractive on bad days (refuge);
- * outdoor places lose value when it's too hot, too cold, or wet.
+ * How much the weather should push the optimizer toward/away from a place at the
+ * time it would actually be visited. When `visitHour` (0–23) is given and an
+ * hourly forecast is available, the too-hot / too-cold / wet checks use the
+ * forecast for THAT hour — so a sun-baked viewpoint loses value at 14:00 (38 °C)
+ * but keeps it at 09:00 (24 °C), steering outdoor stops into the cool hours and
+ * indoor refuges into the harsh ones (and vice-versa for cold mornings).
  */
 export function weatherImpact(
   place: Place,
   weather: DayWeather | undefined,
   prefs: TripPreferences,
+  visitHour?: number,
 ): WeatherImpact {
   const warnings: string[] = [];
   if (!weather) return { multiplier: 1, warnings };
 
+  // Prefer the hour-of-visit forecast; fall back to the day's extremes.
+  const hour = visitHour != null ? Math.max(0, Math.min(23, Math.floor(visitHour))) : undefined;
+  const hourlyTemp = hour != null ? weather.hourlyTempC?.[hour] : undefined;
+  const hourlyPrecip = hour != null ? weather.hourlyPrecipProb?.[hour] : undefined;
+  const tempForHot = hourlyTemp ?? weather.tempMaxC;
+  const tempForCold = hourlyTemp ?? weather.tempMinC;
+  const precip = hourlyPrecip ?? weather.precipitationProbability;
+
   const sensitivity = place.weatherSensitivity;
   const wet =
     (prefs.weather?.avoidRain ?? true) &&
-    (BAD_CONDITIONS.has(weather.condition) || weather.precipitationProbability >= 60);
+    (BAD_CONDITIONS.has(weather.condition) || precip >= 60);
   const hot =
-    prefs.weather?.avoidOutdoorAboveC != null &&
-    weather.tempMaxC > prefs.weather.avoidOutdoorAboveC;
+    prefs.weather?.avoidOutdoorAboveC != null && tempForHot > prefs.weather.avoidOutdoorAboveC;
   const cold =
-    prefs.weather?.avoidOutdoorBelowC != null &&
-    weather.tempMinC < prefs.weather.avoidOutdoorBelowC;
+    prefs.weather?.avoidOutdoorBelowC != null && tempForCold < prefs.weather.avoidOutdoorBelowC;
 
   if (sensitivity === 'indoor') {
-    // Indoor venues are a good call when the weather is poor.
-    const refuge = wet || hot || cold ? 1.1 : 1;
+    // Indoor venues are a good call when the weather is poor at that hour.
+    const refuge = wet || hot || cold ? 1.12 : 1;
     return { multiplier: refuge, warnings };
   }
 
@@ -171,12 +181,12 @@ export function weatherImpact(
     warnings.push('Rain likely — mostly outdoors');
   }
   if (hot) {
-    multiplier *= 1 - 0.4 * exposure;
-    warnings.push(`Hot (${Math.round(weather.tempMaxC)}°C) — mostly outdoors`);
+    multiplier *= 1 - 0.45 * exposure;
+    warnings.push(`Hot (${Math.round(tempForHot)}°C) at this hour — mostly outdoors`);
   }
   if (cold) {
     multiplier *= 1 - 0.4 * exposure;
-    warnings.push(`Cold (${Math.round(weather.tempMinC)}°C) — mostly outdoors`);
+    warnings.push(`Cold (${Math.round(tempForCold)}°C) at this hour — mostly outdoors`);
   }
 
   return { multiplier: Math.max(0.2, multiplier), warnings };

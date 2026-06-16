@@ -132,15 +132,21 @@ function weatherSensitivityByCategory(category: PlaceCategory): WeatherSensitivi
   }
 }
 
-/** Map Google price_level (0-4) to PriceInfo tier. */
-function priceLevel(level: number | undefined): PriceInfo | undefined {
+/** Map Google price_level (0-4) to an approximate PriceInfo tier in `currency`. */
+function priceLevel(level: number | undefined, currency = 'USD'): PriceInfo | undefined {
   if (level == null) return undefined;
-  const amounts: Record<number, number | null> = { 0: 0, 1: 10, 2: 25, 3: 50, 4: 100 };
+  // Tier midpoints, scaled for zero-decimal currencies (JPY etc.) so ¥ amounts
+  // read sensibly rather than ¥10.
+  const base: Record<number, number | null> = { 0: 0, 1: 10, 2: 25, 3: 50, 4: 100 };
+  const zeroDecimal = new Set(['JPY', 'KRW', 'VND', 'IDR', 'HUF', 'CLP', 'ISK']);
+  const scale = zeroDecimal.has(currency) ? 130 : 1;
+  const raw = base[level] ?? null;
   return {
-    amount: amounts[level] ?? null,
-    currency: 'USD',
+    amount: raw == null ? null : raw * scale,
+    currency,
     free: level === 0,
     acceptedPayments: ['card', 'cash'],
+    notes: 'Approx. — live price tier',
   };
 }
 
@@ -200,7 +206,7 @@ interface GooglePlaceResult {
   };
 }
 
-function googleResultToPlace(r: GooglePlaceResult, isFood = false): Place {
+function googleResultToPlace(r: GooglePlaceResult, isFood = false, currency = 'USD'): Place {
   const types = r.types ?? [];
   const category = typesToCategory(types);
   return {
@@ -214,7 +220,7 @@ function googleResultToPlace(r: GooglePlaceResult, isFood = false): Place {
     interests: typesToInterests(types),
     rating: r.rating,
     userRatingsTotal: r.user_ratings_total,
-    price: priceLevel(r.price_level),
+    price: priceLevel(r.price_level, currency),
     openingHours: parseGoogleHours(r.opening_hours?.periods),
     dwellMinutes: dwellByCategory(category),
     weatherSensitivity: weatherSensitivityByCategory(category),
@@ -317,7 +323,7 @@ export const placesProvider: PlacesProvider = {
           `&key=${serviceConfig.googleApiKey}`;
         const data = await gFetch<{ status: string; results: GooglePlaceResult[] }>(url);
         if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
-          return data.results.slice(0, limit).map((r) => googleResultToPlace(r));
+          return data.results.slice(0, limit).map((r) => googleResultToPlace(r, false, params.currency));
         }
       } catch {
         // fall through to mock
@@ -454,7 +460,7 @@ export const placesProvider: PlacesProvider = {
           `&key=${serviceConfig.googleApiKey}`;
         const data = await gFetch<{ status: string; results: GooglePlaceResult[] }>(url);
         if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
-          return data.results.slice(0, limit).map((r) => googleResultToPlace(r, true));
+          return data.results.slice(0, limit).map((r) => googleResultToPlace(r, true, params.currency));
         }
       } catch {
         // fall through to mock
