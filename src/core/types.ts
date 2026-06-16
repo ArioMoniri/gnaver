@@ -135,6 +135,8 @@ export interface Place {
   googlePlaceId?: string;
   description?: string;
   tags?: string[];
+  /** Signature / must-try dishes at this place (food stops). */
+  dishes?: string[];
   /** User flagged "really nice — I should go". Strongly prioritised. */
   mustSee?: boolean;
   /** True for food candidates injected by the recommender. */
@@ -173,13 +175,20 @@ export interface WeatherPrefs {
   avoidRain?: boolean;
 }
 
+/** Which meals to weave into the day. */
+export type MealKind = 'breakfast' | 'lunch' | 'dinner';
+
 export interface TripPreferences {
   interests: Interest[];
   transport: TransportMode;
   pace: Pace;
   maxWalkMinutes?: number;
   includeFood: boolean;
+  /** Meals to insert (default lunch + dinner). Empty/undefined → none. */
+  meals?: MealKind[];
   foodBudget?: FoodBudget;
+  /** Also surface quick/fast options (e.g. a 15-min bite) alongside sit-downs. */
+  includeQuick?: boolean;
   cuisinePrefs?: string[];
   dietary?: string[];
   weather?: WeatherPrefs;
@@ -321,6 +330,9 @@ export interface FoodSearchParams {
 export interface ParsedList {
   title?: string;
   places: Place[];
+  /** True when we couldn't read the real list and returned sample data (so the
+   *  UI can be honest about it rather than pretending the import worked). */
+  fromSample?: boolean;
 }
 
 export interface PlacesProvider {
@@ -349,6 +361,14 @@ export interface TasteProvider {
   readonly name: string;
   /** Rank/curate food candidates against the traveller's taste. */
   rankFood(candidates: Place[], prefs: TripPreferences, context?: string): Promise<Place[]>;
+  /**
+   * Suggest 1–3 signature dishes for each given food place in a city.
+   * Returns a map keyed by place id. Live LLM when keyed; otherwise echoes any
+   * curated `dishes` already on the place (or {}).
+   */
+  suggestDishes(places: Place[], city: string): Promise<Record<string, string[]>>;
+  /** Must-try local dishes for a city (general, not place-specific). */
+  localDishes(city: string): Promise<string[]>;
   /** Free-form conversational ask (used by the "ask about my taste" flow). */
   ask(prompt: string): Promise<string>;
 }

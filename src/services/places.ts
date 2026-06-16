@@ -22,6 +22,7 @@ import type {
 } from '@/core';
 import {
   classifyGoogleUrl,
+  currencyForCountry,
   parseCoordsFromUrl,
   parsePlaceNameFromUrl,
   rankFoodHeuristic,
@@ -264,7 +265,7 @@ function geocodingToCity(r: GeocodingResult): ResolvedCity {
     city: city || 'Unknown',
     country: country || 'Unknown',
     center: { lat: r.geometry.location.lat, lng: r.geometry.location.lng },
-    currency: 'USD', // cannot reliably determine from geocoding; UI can override
+    currency: currencyForCountry(countryCode) ?? 'USD',
     timezone: 'UTC',
     countryCode,
   };
@@ -378,7 +379,7 @@ export const placesProvider: PlacesProvider = {
           resolved = await expandShortLink(url);
         } catch {
           // Use the sample list if we can't follow the redirect
-          return getSampleSharedList();
+          return { ...getSampleSharedList(), fromSample: true };
         }
       }
 
@@ -429,10 +430,10 @@ export const placesProvider: PlacesProvider = {
       }
 
       // For full list URLs — we cannot scrape Google Maps HTML reliably, so
-      // fall back to the curated sample so the demo always has content.
-      return getSampleSharedList();
+      // fall back to the curated sample, flagged so the UI can disclose it.
+      return { ...getSampleSharedList(), fromSample: true };
     } catch {
-      return getSampleSharedList();
+      return { ...getSampleSharedList(), fromSample: true };
     }
   },
 

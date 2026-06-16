@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { FoodBudget, Interest, Pace, TransportMode } from '@/core';
+import type { FoodBudget, Interest, MealKind, Pace, TransportMode } from '@/core';
 
 export interface SettingsState {
   /** Default sightseeing window (minutes from midnight). */
@@ -17,6 +17,7 @@ export interface SettingsState {
   transport: TransportMode;
   pace: Pace;
   includeFood: boolean;
+  meals: MealKind[];
   foodBudget: FoodBudget;
   cuisinePrefs: string[];
   dietary: string[];
@@ -37,6 +38,7 @@ const DEFAULTS = {
   transport: 'mixed' as TransportMode,
   pace: 'balanced' as Pace,
   includeFood: true,
+  meals: ['lunch', 'dinner'] as MealKind[],
   foodBudget: 'mid' as FoodBudget,
   cuisinePrefs: [] as string[],
   dietary: [] as string[],

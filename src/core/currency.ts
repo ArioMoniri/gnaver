@@ -43,6 +43,26 @@ export function currencySymbol(code: CurrencyCode): string {
   return SYMBOLS[code] ?? `${code} `;
 }
 
+/** ISO-3166 country code → ISO-4217 currency, for live-geocoded destinations. */
+const COUNTRY_CURRENCY: Record<string, CurrencyCode> = {
+  US: 'USD', GB: 'GBP', JP: 'JPY', CN: 'CNY', KR: 'KRW', TH: 'THB', IN: 'INR',
+  TR: 'TRY', CH: 'CHF', AU: 'AUD', CA: 'CAD', BR: 'BRL', MX: 'MXN', AE: 'AED',
+  SG: 'SGD', HK: 'HKD', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', CZ: 'CZK',
+  HU: 'HUF', ZA: 'ZAR', ID: 'IDR', MY: 'MYR', PH: 'PHP', VN: 'VND', NZ: 'NZD',
+  RU: 'RUB', SA: 'SAR', EG: 'EGP', IL: 'ILS', MA: 'MAD', AR: 'ARS', CL: 'CLP',
+  CO: 'COP', PE: 'PEN', TW: 'TWD',
+  // Eurozone
+  PT: 'EUR', ES: 'EUR', FR: 'EUR', IT: 'EUR', DE: 'EUR', NL: 'EUR', BE: 'EUR',
+  AT: 'EUR', IE: 'EUR', GR: 'EUR', FI: 'EUR', LU: 'EUR', SK: 'EUR', SI: 'EUR',
+  EE: 'EUR', LV: 'EUR', LT: 'EUR', CY: 'EUR', MT: 'EUR', HR: 'EUR',
+};
+
+/** Best-effort currency for a 2-letter country code (undefined if unknown). */
+export function currencyForCountry(countryCode: string | undefined): CurrencyCode | undefined {
+  if (!countryCode) return undefined;
+  return COUNTRY_CURRENCY[countryCode.toUpperCase()];
+}
+
 /** 12 + "EUR" → "€12". 1500 + "JPY" → "¥1,500". */
 export function formatPrice(amount: number, code: CurrencyCode): string {
   const decimals = ZERO_DECIMAL.has(code) ? 0 : amount % 1 === 0 ? 0 : 2;

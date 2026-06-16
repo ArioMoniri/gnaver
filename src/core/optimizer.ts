@@ -47,9 +47,34 @@ export interface OptimizeInput {
   now?: { date: string; minutes: number };
 }
 
+const BREAKFAST_WINDOW = { start: 7 * 60, end: 10 * 60 + 30 };
 const LUNCH_WINDOW = { start: 12 * 60, end: 14 * 60 + 30 };
 const DINNER_WINDOW = { start: 18 * 60 + 30, end: 21 * 60 };
 const MAX_FOOD_DETOUR_MIN = 25;
+
+/** Which meals to insert; defaults to lunch + dinner when unspecified. */
+function wantsMeal(prefs: TripPreferences, kind: 'breakfast' | 'lunch' | 'dinner'): boolean {
+  return (prefs.meals ?? ['lunch', 'dinner']).includes(kind);
+}
+
+/** Start minute of the next wanted, not-yet-eaten meal still reachable today. */
+function nextMealStart(
+  eaten: { breakfast: boolean; lunch: boolean; dinner: boolean },
+  prefs: TripPreferences,
+  time: number,
+  dayEnd: number,
+): number | null {
+  if (wantsMeal(prefs, 'breakfast') && !eaten.breakfast && time < BREAKFAST_WINDOW.start) {
+    return BREAKFAST_WINDOW.start;
+  }
+  if (wantsMeal(prefs, 'lunch') && !eaten.lunch && time < LUNCH_WINDOW.start && LUNCH_WINDOW.start <= dayEnd) {
+    return LUNCH_WINDOW.start;
+  }
+  if (wantsMeal(prefs, 'dinner') && !eaten.dinner && time < DINNER_WINDOW.start && DINNER_WINDOW.start <= dayEnd) {
+    return DINNER_WINDOW.start;
+  }
+  return null;
+}
 
 const PACE_DWELL_FACTOR: Record<TripPreferences['pace'], number> = {
   relaxed: 1.25,
@@ -192,7 +217,7 @@ function pickMeal(pos: LatLng | null, time: number, dwell: number, ctx: DayConte
 function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: Set<string> } {
   const stops: BuiltStop[] = [];
   const used = new Set<string>();
-  const eaten = { lunch: false, dinner: false };
+  const eaten = { breakfast: false, lunch: false, dinner: false };
   const includeFood = ctx.prefs.includeFood && ctx.food.length > 0;
 
   // null start = no fixed day-start point; the first chosen stop begins the day
@@ -201,8 +226,25 @@ function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: S
   let time = ctx.startMinutes;
 
   for (let guard = 0; guard < 60; guard++) {
+    // Breakfast in the early window (if requested).
+    if (
+      includeFood &&
+      wantsMeal(ctx.prefs, 'breakfast') &&
+      !eaten.breakfast &&
+      time >= BREAKFAST_WINDOW.start &&
+      time < LUNCH_WINDOW.start
+    ) {
+      const meal = pickMeal(pos, time, 45, ctx);
+      eaten.breakfast = true;
+      if (meal) {
+        stops.push(meal);
+        pos = meal.place.location;
+        time = meal.departureMinutes;
+        continue;
+      }
+    }
     // Eat lunch at the first free moment after noon (before dinner time).
-    if (includeFood && !eaten.lunch && time >= LUNCH_WINDOW.start && time < DINNER_WINDOW.start) {
+    if (includeFood && wantsMeal(ctx.prefs, 'lunch') && !eaten.lunch && time >= LUNCH_WINDOW.start && time < DINNER_WINDOW.start) {
       const meal = pickMeal(pos, time, 60, ctx);
       eaten.lunch = true;
       if (meal) {
@@ -213,7 +255,7 @@ function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: S
       }
     }
     // Dinner once we cross into the evening, while the day window still allows it.
-    if (includeFood && !eaten.dinner && time >= DINNER_WINDOW.start && time <= ctx.window.endMinutes) {
+    if (includeFood && wantsMeal(ctx.prefs, 'dinner') && !eaten.dinner && time >= DINNER_WINDOW.start && time <= ctx.window.endMinutes) {
       const meal = pickMeal(pos, time, 90, ctx);
       eaten.dinner = true;
       if (meal) {
@@ -238,7 +280,17 @@ function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: S
       }
     }
 
-    if (!best) break;
+    if (!best) {
+      // No attraction fits right now — if a wanted meal is still ahead, fast-
+      // forward to its window so it still gets inserted (a light day shouldn't
+      // skip lunch). Otherwise the day is done.
+      const next = includeFood ? nextMealStart(eaten, ctx.prefs, time, ctx.window.endMinutes) : null;
+      if (next != null && next > time) {
+        time = next;
+        continue;
+      }
+      break;
+    }
     stops.push(best);
     used.add(best.place.id);
     pos = best.place.location;

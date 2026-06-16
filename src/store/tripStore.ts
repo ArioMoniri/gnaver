@@ -60,6 +60,7 @@ const DEFAULT_PREFS: TripPreferences = {
   transport: 'mixed',
   pace: 'balanced',
   includeFood: true,
+  meals: ['lunch', 'dinner'],
   foodBudget: 'mid',
   weather: { avoidRain: true, avoidOutdoorAboveC: 34, avoidOutdoorBelowC: 2 },
 };

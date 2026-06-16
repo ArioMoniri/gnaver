@@ -17,7 +17,7 @@ export const lisbonPlaces: Place[] = [
     },
     openingHours: {
       weekly: {
-        2: [{ open: 600, close: 1050 }, { open: 1200, close: 1050 }], // Tue
+        2: [{ open: 600, close: 1050 }], // Tue
         3: [{ open: 600, close: 1110 }],
         4: [{ open: 600, close: 1110 }],
         5: [{ open: 600, close: 1110 }],

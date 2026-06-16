@@ -179,6 +179,19 @@ function parseIdList(text: string): string[] {
   return ids;
 }
 
+/** Tolerant JSON-object parser for `{id:[dishes]}` style LLM replies. */
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  const clean = text.replace(/```[\s\S]*?```/g, '').replace(/`/g, '');
+  const m = /\{[\s\S]*\}/.exec(clean);
+  if (!m) return null;
+  try {
+    const o: unknown = JSON.parse(m[0]);
+    return o && typeof o === 'object' ? (o as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Heuristic canned response (mock mode)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +274,47 @@ export const tasteProvider: TasteProvider = {
     } catch {
       // Any LLM or parse failure → fall back to heuristic
       return preRanked;
+    }
+  },
+
+  // ── suggestDishes ───────────────────────────────────────────────────────────
+  async suggestDishes(places: Place[], city: string): Promise<Record<string, string[]>> {
+    const result: Record<string, string[]> = {};
+    // Seed from any curated dishes already on the place (offline-friendly).
+    for (const p of places) if (p.dishes?.length) result[p.id] = p.dishes.slice(0, 3);
+
+    if (!features.liveTaste || places.length === 0) return result;
+    try {
+      const summaries = places.map((p) => ({ id: p.id, name: p.name, tags: p.tags?.slice(0, 3) }));
+      const prompt =
+        `For each eatery in ${city}, give 1-3 signature / must-try dishes.\n` +
+        `Eateries (JSON): ${JSON.stringify(summaries)}\n` +
+        `Reply with ONLY a JSON object mapping each id to an array of dish names, ` +
+        `e.g. {"id1":["Dish A","Dish B"]}. No prose.`;
+      const obj = parseJsonObject(await callLLM(prompt));
+      if (obj) {
+        for (const p of places) {
+          const d = obj[p.id];
+          if (Array.isArray(d) && d.length) result[p.id] = d.map((x) => String(x)).slice(0, 3);
+        }
+      }
+      return result;
+    } catch {
+      return result;
+    }
+  },
+
+  // ── localDishes ─────────────────────────────────────────────────────────────
+  async localDishes(city: string): Promise<string[]> {
+    if (!features.liveTaste) return [];
+    try {
+      const text = await callLLM(
+        `List exactly 6 must-try local dishes a visitor should eat in ${city}. ` +
+          `Reply with ONLY a JSON array of short dish names. No prose.`,
+      );
+      return parseIdList(text).slice(0, 6);
+    } catch {
+      return [];
     }
   },
 

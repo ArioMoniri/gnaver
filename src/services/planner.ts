@@ -129,7 +129,20 @@ export async function generateItinerary(
             `Day ${day.date} in ${trip.city ?? trip.title}`,
           );
 
-          foodByDate[day.date] = ranked;
+          // Enrich the top picks with signature-dish suggestions (live LLM when
+          // keyed; otherwise keeps any curated dishes already on the place).
+          const cityName = trip.city ?? trip.title;
+          let enriched = ranked;
+          try {
+            const dishMap = await tasteProvider.suggestDishes(ranked.slice(0, 8), cityName);
+            enriched = ranked.map((p) =>
+              dishMap[p.id]?.length ? { ...p, dishes: dishMap[p.id] } : p,
+            );
+          } catch {
+            /* dishes are a nice-to-have; ignore failures */
+          }
+
+          foodByDate[day.date] = enriched;
         } catch {
           // Skip food for this day rather than failing the whole itinerary
         }

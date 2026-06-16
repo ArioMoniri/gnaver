@@ -336,11 +336,11 @@ function FootnoteLinks({ onRestore }: { onRestore: () => void }) {
         <Text variant="footnote" tone="accent">Restore purchases</Text>
       </Pressable>
       <Text variant="footnote" tone="tertiary">·</Text>
-      <Pressable onPress={() => void Linking.openURL('https://github.com/ruvnet/claude-flow')} accessibilityRole="link">
+      <Pressable onPress={() => void Linking.openURL('https://github.com/ArioMoniri/gnaver')} accessibilityRole="link">
         <Text variant="footnote" tone="tertiary">Terms</Text>
       </Pressable>
       <Text variant="footnote" tone="tertiary">·</Text>
-      <Pressable onPress={() => void Linking.openURL('https://github.com/ruvnet/claude-flow')} accessibilityRole="link">
+      <Pressable onPress={() => void Linking.openURL('https://github.com/ArioMoniri/gnaver')} accessibilityRole="link">
         <Text variant="footnote" tone="tertiary">Privacy</Text>
       </Pressable>
     </View>
