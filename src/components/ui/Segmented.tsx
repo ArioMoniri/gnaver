@@ -6,7 +6,7 @@
  * specular top edge, sliding on a spring. Over the map, pass `overMap` to render
  * the track as real Liquid Glass.
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   LayoutChangeEvent,
@@ -42,16 +42,20 @@ export function Segmented<T extends string>({ options, value, onChange, overMap 
   const theme = useTheme();
   const widthRef = useRef(0);
   const translate = useRef(new Animated.Value(0)).current;
+  const [segWidth, setSegWidth] = useState(0);
 
   const index = Math.max(
     0,
     options.findIndex((o) => o.value === value),
   );
   const count = Math.max(1, options.length);
+  const PAD = 4;
 
   const moveTo = useCallback(
     (i: number, animate: boolean) => {
-      const seg = widthRef.current / count;
+      // Content width excludes the track's left+right padding so the last
+      // segment's thumb sits flush inside the outline (never overflows it).
+      const seg = (widthRef.current - PAD * 2) / count;
       const to = seg * i;
       if (!animate) {
         translate.setValue(to);
@@ -75,9 +79,10 @@ export function Segmented<T extends string>({ options, value, onChange, overMap 
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
       widthRef.current = e.nativeEvent.layout.width;
+      setSegWidth((e.nativeEvent.layout.width - PAD * 2) / count);
       moveTo(index, false);
     },
-    [index, moveTo],
+    [count, index, moveTo],
   );
 
   const segments = (
@@ -87,8 +92,8 @@ export function Segmented<T extends string>({ options, value, onChange, overMap 
         style={[
           styles.thumb,
           {
-            width: `${100 / count}%`,
-            borderRadius: theme.radius.md - 1,
+            width: segWidth,
+            borderRadius: theme.radius.md - 2,
             transform: [{ translateX: translate }],
           },
           theme.elevation.card,

@@ -55,6 +55,18 @@ function todayLocal(): { date: string; minutes: number } {
   };
 }
 
+/**
+ * Default trip start date. After ~3pm "today" can't fit a real day of sightseeing
+ * (the optimizer won't schedule in the past), so we default to TOMORROW — the
+ * user can always pick an earlier date with the date picker.
+ */
+function defaultStartDate(): string {
+  const d = new Date();
+  if (d.getHours() >= 15) d.setDate(d.getDate() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const DEFAULT_PREFS: TripPreferences = {
   interests: ['culture', 'food', 'architecture'],
   transport: 'mixed',
@@ -132,7 +144,7 @@ const initial = {
   center: undefined as LatLng | undefined,
   candidates: [] as Place[],
   selectedIds: {} as Record<string, boolean>,
-  startDate: todayLocal().date,
+  startDate: defaultStartDate(),
   dayCount: 3,
   startMinutes: 9 * 60,
   endMinutes: 21 * 60,
@@ -190,7 +202,7 @@ export const useTrip = create<TripState>()((set, get) => ({
     const places = getCityPlaces(cityId);
     set({
       ...initial,
-      startDate: todayLocal().date,
+      startDate: defaultStartDate(),
       source: 'city',
       cityId,
       title: meta.name,
@@ -208,7 +220,11 @@ export const useTrip = create<TripState>()((set, get) => ({
     if (!q) return;
     set({ status: 'loadingCandidates', error: undefined });
     try {
-      const resolved = await placesProvider.resolveCity(q);
+      let resolved = await placesProvider.resolveCity(q);
+      // "Paris, France" → retry on just the city part so suggestion labels resolve.
+      if (!resolved && q.includes(',')) {
+        resolved = await placesProvider.resolveCity(q.split(',')[0].trim());
+      }
       if (!resolved) {
         set({
           status: 'error',
@@ -238,7 +254,7 @@ export const useTrip = create<TripState>()((set, get) => ({
       }
       set({
         ...initial,
-        startDate: todayLocal().date,
+        startDate: defaultStartDate(),
         source: 'city',
         cityId: cityIdForCenter(resolved.center),
         title: resolved.city,
@@ -264,7 +280,7 @@ export const useTrip = create<TripState>()((set, get) => ({
       const meta = cityId ? listCities().find((c) => c.id === cityId) : undefined;
       set({
         ...initial,
-        startDate: todayLocal().date,
+        startDate: defaultStartDate(),
         source: 'link',
         sourceUrl: url,
         cityId,
@@ -289,7 +305,7 @@ export const useTrip = create<TripState>()((set, get) => ({
     const meta = cityId ? listCities().find((c) => c.id === cityId) : undefined;
     set({
       ...initial,
-      startDate: todayLocal().date,
+      startDate: defaultStartDate(),
       source: 'link',
       title: sample.title,
       cityId,
@@ -384,5 +400,5 @@ export const useTrip = create<TripState>()((set, get) => ({
     await get().generate();
   },
 
-  reset: () => set({ ...initial, startDate: todayLocal().date }),
+  reset: () => set({ ...initial, startDate: defaultStartDate() }),
 }));

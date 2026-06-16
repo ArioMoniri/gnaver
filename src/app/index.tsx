@@ -255,9 +255,13 @@ export default function NewTripScreen() {
       hapticSelection();
       setCityQuery(suggestion.label);
       setSuggestions([]);
-      void trip.startFromCityQuery(suggestion.label);
+      // A curated suggestion carries our city id — load it directly (works
+      // offline). Live (Google) suggestions geocode via the label.
+      const curated = suggestion.id && cities.some((c) => c.id === suggestion.id);
+      if (curated && suggestion.id) void trip.startFromCity(suggestion.id);
+      else void trip.startFromCityQuery(suggestion.label);
     },
-    [trip],
+    [trip, cities],
   );
 
   const onPickCity = useCallback(
