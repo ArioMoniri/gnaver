@@ -8,7 +8,7 @@
  * without awaiting, closing over a pre-fetched routing matrix.
  */
 
-import type { LatLng, RouteLeg, RoutingProvider, TransportMode } from '@/core';
+import type { LatLng, RouteLeg, RoutingProvider, TransitStep, TransitVehicle, TransportMode } from '@/core';
 import { estimateLeg, haversineMeters } from '@/core';
 import { serviceConfig, features } from './config';
 import type { TravelFn } from '@/core/optimizer';
@@ -49,14 +49,99 @@ function toGoogleMode(mode: TransportMode): string {
 // Google Directions response shapes (minimal)
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface DirectionsTransitStop {
+  name?: string;
+}
+
+interface DirectionsTransitLine {
+  name?: string;
+  short_name?: string;
+  color?: string;
+  text_color?: string;
+  vehicle?: { type?: string; name?: string };
+}
+
+interface DirectionsTransitDetails {
+  departure_stop?: DirectionsTransitStop;
+  arrival_stop?: DirectionsTransitStop;
+  line?: DirectionsTransitLine;
+  headsign?: string;
+  num_stops?: number;
+  departure_time?: { text?: string };
+}
+
+interface DirectionsStep {
+  travel_mode?: string; // "TRANSIT" | "WALKING" | "DRIVING" | ...
+  transit_details?: DirectionsTransitDetails;
+}
+
 interface DirectionsLeg {
   distance: { value: number };   // metres
   duration: { value: number };   // seconds
+  steps?: DirectionsStep[];
 }
 
 interface DirectionsRoute {
   legs: DirectionsLeg[];
   overview_polyline?: { points: string };
+}
+
+// Google transit vehicle.type → our coarse TransitVehicle class.
+function toTransitVehicle(type: string | undefined): TransitVehicle {
+  switch ((type ?? '').toUpperCase()) {
+    case 'BUS':
+    case 'INTERCITY_BUS':
+    case 'TROLLEYBUS':
+    case 'SHARE_TAXI':
+      return 'bus';
+    case 'SUBWAY':
+    case 'METRO_RAIL':
+      return 'subway';
+    case 'TRAM':
+    case 'LIGHT_RAIL':
+      return 'tram';
+    case 'HEAVY_RAIL':
+    case 'COMMUTER_TRAIN':
+    case 'HIGH_SPEED_TRAIN':
+    case 'LONG_DISTANCE_TRAIN':
+    case 'MONORAIL':
+    case 'RAIL':
+      return 'rail';
+    case 'FERRY':
+      return 'ferry';
+    case 'CABLE_CAR':
+    case 'GONDOLA_LIFT':
+      return 'cable';
+    case 'FUNICULAR':
+      return 'funicular';
+    default:
+      return 'other';
+  }
+}
+
+/** Extract per-line transit detail from a Directions route's steps (display-only). */
+function parseTransitSteps(route: DirectionsRoute): TransitStep[] | undefined {
+  const steps = route.legs[0]?.steps ?? [];
+  const out: TransitStep[] = [];
+  for (const step of steps) {
+    if (step.travel_mode !== 'TRANSIT' || !step.transit_details) continue;
+    const td = step.transit_details;
+    const line = td.line ?? {};
+    const label = line.short_name || line.name || '';
+    out.push({
+      vehicle: toTransitVehicle(line.vehicle?.type),
+      line: label,
+      lineName: line.name && line.name !== label ? line.name : undefined,
+      color: line.color,
+      textColor: line.text_color,
+      from: td.departure_stop?.name ?? '',
+      to: td.arrival_stop?.name ?? '',
+      numStops: td.num_stops,
+      headsign: td.headsign,
+      departure: td.departure_time?.text,
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 interface DirectionsResponse {
@@ -84,10 +169,13 @@ function directionsToLeg(
   mode: TransportMode,
 ): RouteLeg {
   const leg = route.legs[0];
+  const transit =
+    mode === 'transit' || mode === 'mixed' ? parseTransitSteps(route) : undefined;
   return {
     mode,
     distanceMeters: leg.distance.value,
     durationMinutes: Math.max(1, Math.round(leg.duration.value / 60)),
+    ...(transit ? { transit } : {}),
   };
 }
 

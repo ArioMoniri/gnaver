@@ -16,6 +16,8 @@ import {
   formatPayments,
   type CurrencyCode,
   type ScheduledStop,
+  type TransitStep,
+  type TransitVehicle,
 } from '@/core';
 import { useTheme } from '@/theme';
 import { Text, GlassCard, IconSymbol, RatingStars, Tag, hapticSelection } from '@/components/ui';
@@ -77,6 +79,16 @@ export function TimelineStop({
             <Text variant="caption" tone="secondary">
               {transportMeta(leg.mode).emoji} {formatDuration(leg.durationMinutes)} · {formatDistance(leg.distanceMeters)}
             </Text>
+          </View>
+        ) : null}
+
+        {/* Public-transport detail: which line, its colour, board/alight stations
+            and number of stops (from Google Directions). */}
+        {leg?.transit && leg.transit.length > 0 ? (
+          <View style={styles.transit}>
+            {leg.transit.map((step, i) => (
+              <TransitStepRow key={i} step={step} theme={theme} />
+            ))}
           </View>
         ) : null}
 
@@ -203,6 +215,58 @@ export function TimelineStop({
   );
 }
 
+function vehicleMeta(v: TransitVehicle): { emoji: string; label: string } {
+  switch (v) {
+    case 'bus': return { emoji: '🚌', label: 'Bus' };
+    case 'subway': return { emoji: '🚇', label: 'Metro' };
+    case 'tram': return { emoji: '🚊', label: 'Tram' };
+    case 'rail': return { emoji: '🚆', label: 'Train' };
+    case 'ferry': return { emoji: '⛴', label: 'Ferry' };
+    case 'cable': return { emoji: '🚠', label: 'Cable car' };
+    case 'funicular': return { emoji: '🚞', label: 'Funicular' };
+    default: return { emoji: '🚍', label: 'Transit' };
+  }
+}
+
+/** Accept Google's "#FFCD00" (or bare "FFCD00") hex; ignore anything else. */
+function normalizeHex(c?: string): string | undefined {
+  if (!c) return undefined;
+  const s = c.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s;
+  if (/^[0-9a-fA-F]{6}$/.test(s)) return `#${s}`;
+  return undefined;
+}
+
+/** One transit hop: a colour-coded line chip + direction + board/alight stations. */
+function TransitStepRow({ step, theme }: { step: TransitStep; theme: ReturnType<typeof useTheme> }) {
+  const bg = normalizeHex(step.color) ?? theme.colors.accent;
+  const fg = normalizeHex(step.textColor) ?? '#FFFFFF';
+  const v = vehicleMeta(step.vehicle);
+  const stopsLabel =
+    step.numStops != null ? ` · ${step.numStops} stop${step.numStops === 1 ? '' : 's'}` : '';
+  return (
+    <View style={styles.transitStep}>
+      <View style={styles.transitLineRow}>
+        <View style={[styles.lineChip, { backgroundColor: bg }]}>
+          <Text variant="caption" weight="800" style={{ color: fg }}>
+            {v.emoji} {step.line || v.label}
+          </Text>
+        </View>
+        {step.headsign ? (
+          <Text variant="caption" tone="secondary" numberOfLines={1} style={styles.transitHeadsign}>
+            → {step.headsign}
+          </Text>
+        ) : null}
+      </View>
+      {step.from || step.to ? (
+        <Text variant="caption" tone="tertiary" style={styles.transitStations} numberOfLines={2}>
+          {v.label} · {step.from || '—'} → {step.to || '—'}{stopsLabel}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function ReorderButton({
   icon,
   glyph,
@@ -300,6 +364,31 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 8,
+  },
+  transit: {
+    gap: 6,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  transitStep: {
+    gap: 2,
+  },
+  transitLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lineChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  transitHeadsign: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  transitStations: {
+    marginLeft: 2,
   },
   foodRail: {
     position: 'absolute',

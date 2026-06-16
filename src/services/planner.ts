@@ -7,13 +7,14 @@
  * when the device is fully offline.
  */
 
-import type { ItineraryResult, LatLng, Place, Trip } from '@/core';
+import type { ItineraryResult, LatLng, Place, TransitStep, TransportMode, Trip } from '@/core';
 import { centroid, estimateLeg, optimizeItinerary } from '@/core';
 import type { TravelFn } from '@/core/optimizer';
 import { placesProvider } from './places';
 import { routingProvider, buildTravelFn } from './routing';
 import { weatherProvider } from './weather';
 import { tasteProvider } from './llm';
+import { features } from './config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -151,8 +152,9 @@ export async function generateItinerary(
   }
 
   // ── (d) Optimize ─────────────────────────────────────────────────────────
+  let result: ItineraryResult;
   try {
-    return optimizeItinerary({
+    result = optimizeItinerary({
       trip,
       travel,
       weatherByDate: Object.keys(weatherByDate).length > 0 ? weatherByDate : undefined,
@@ -161,6 +163,60 @@ export async function generateItinerary(
     });
   } catch {
     // Absolute last resort: run optimizer with no enrichment data
-    return optimizeItinerary({ trip });
+    result = optimizeItinerary({ trip });
   }
+
+  // ── (e) Transit detail (display-only) ──────────────────────────────────────
+  // For transit/mixed trips, fetch per-line Directions detail (line, colour,
+  // vehicle, board/alight stations, stop count) and attach it to each leg.
+  if (!aborted()) {
+    try {
+      await enrichTransitDetail(result, trip.preferences.transport, opts?.signal);
+    } catch {
+      // Transit detail is a nice-to-have; never fail the plan for it.
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Attach per-line transit detail to each travel leg of a finished itinerary.
+ * The optimizer routes on a Distance-Matrix time matrix (no step detail); here
+ * we issue a bounded set of Directions calls (which DO return transit_details)
+ * and decorate the legs in place. No-ops offline or for non-transit trips.
+ */
+async function enrichTransitDetail(
+  result: ItineraryResult,
+  mode: TransportMode,
+  signal?: AbortSignal,
+): Promise<void> {
+  if ((mode !== 'transit' && mode !== 'mixed') || !features.livePlaces) return;
+
+  const MAX_LEGS = 40; // hard cap on Directions calls per generation
+  type Task = { from: LatLng; to: LatLng; apply: (steps: TransitStep[]) => void };
+  const tasks: Task[] = [];
+
+  for (const day of result.days) {
+    let prev: LatLng | undefined = day.startLocation;
+    for (const stop of day.stops) {
+      const leg = stop.legToHere;
+      if (prev && leg) {
+        tasks.push({ from: prev, to: stop.place.location, apply: (s) => { leg.transit = s; } });
+      }
+      prev = stop.place.location;
+    }
+    if (prev && day.endLeg && day.endLocation) {
+      const leg = day.endLeg;
+      tasks.push({ from: prev, to: day.endLocation, apply: (s) => { leg.transit = s; } });
+    }
+  }
+
+  await Promise.allSettled(
+    tasks.slice(0, MAX_LEGS).map(async (t) => {
+      if (signal?.aborted) return;
+      const detailed = await routingProvider.leg(t.from, t.to, mode);
+      if (detailed.transit && detailed.transit.length) t.apply(detailed.transit);
+    }),
+  );
 }
