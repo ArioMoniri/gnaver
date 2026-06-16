@@ -35,6 +35,8 @@ export interface TimelineStopProps {
   onMoveDown?: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  /** Tap the card to open the place's photos + reviews. */
+  onPress?: () => void;
 }
 
 export function TimelineStop({
@@ -46,6 +48,7 @@ export function TimelineStop({
   onMoveDown,
   canMoveUp = false,
   canMoveDown = false,
+  onPress,
 }: TimelineStopProps) {
   const theme = useTheme();
   const reorderable = !!(onMoveUp || onMoveDown);
@@ -92,6 +95,12 @@ export function TimelineStop({
           </View>
         ) : null}
 
+        <Pressable
+          onPress={onPress}
+          disabled={!onPress}
+          accessibilityRole={onPress ? 'button' : undefined}
+          accessibilityLabel={onPress ? `${place.name} — photos and reviews` : undefined}
+        >
         <GlassCard padding="md" radius="lg">
           {isFood ? (
             <View pointerEvents="none" style={[styles.foodRail, { backgroundColor: theme.colors.pinFood }]} />
@@ -209,7 +218,18 @@ export function TimelineStop({
               ))}
             </View>
           ) : null}
+
+          {onPress ? (
+            <View style={styles.detailHint}>
+              <IconSymbol name="photo.on.rectangle" size={12} color={accent} fallbackGlyph="🖼" />
+              <Text variant="caption" weight="600" style={{ color: accent }}>
+                Photos & reviews
+              </Text>
+              <IconSymbol name="chevron.right" size={11} color={accent} fallbackGlyph="›" />
+            </View>
+          ) : null}
         </GlassCard>
+        </Pressable>
       </View>
     </View>
   );
@@ -482,5 +502,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
+  },
+  detailHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
   },
 });

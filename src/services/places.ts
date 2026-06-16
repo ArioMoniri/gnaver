@@ -16,6 +16,8 @@ import type {
   ParsedList,
   Place,
   PlaceCategory,
+  PlaceDetails,
+  PlaceReview,
   PlaceSearchParams,
   PlacesProvider,
   PriceInfo,
@@ -209,6 +211,40 @@ interface GooglePlaceResult {
   };
 }
 
+/** Build a Google Place Photo URL from a photo_reference. */
+function placePhotoUrl(ref: string, maxwidth = 800): string {
+  return (
+    `https://maps.googleapis.com/maps/api/place/photo` +
+    `?maxwidth=${maxwidth}&photoreference=${ref}&key=${serviceConfig.googleApiKey}`
+  );
+}
+
+/** A Google Maps deep link for a place (used as an offline / no-`url` fallback). */
+function mapsSearchUrl(place: Place): string {
+  const q = encodeURIComponent(place.name);
+  return place.googlePlaceId
+    ? `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=${place.googlePlaceId}`
+    : `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+
+/** Google Place Details `result` shape for the rich detail card (photos + reviews). */
+interface GooglePlaceDetailsResult {
+  rating?: number;
+  user_ratings_total?: number;
+  url?: string;
+  formatted_address?: string;
+  opening_hours?: { open_now?: boolean };
+  photos?: Array<{ photo_reference: string }>;
+  reviews?: Array<{
+    author_name?: string;
+    rating?: number;
+    text?: string;
+    relative_time_description?: string;
+    profile_photo_url?: string;
+    author_url?: string;
+  }>;
+}
+
 function googleResultToPlace(r: GooglePlaceResult, isFood = false, currency = 'USD'): Place {
   const types = r.types ?? [];
   const category = typesToCategory(types);
@@ -229,9 +265,7 @@ function googleResultToPlace(r: GooglePlaceResult, isFood = false, currency = 'U
     weatherSensitivity: weatherSensitivityByCategory(category),
     address: r.formatted_address ?? r.vicinity,
     googlePlaceId: r.place_id,
-    photoUrl: r.photos?.[0]
-      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${r.photos[0].photo_reference}&key=${serviceConfig.googleApiKey}`
-      : undefined,
+    photoUrl: r.photos?.[0] ? placePhotoUrl(r.photos[0].photo_reference, 800) : undefined,
     isFood: isFood || undefined,
   };
 }
@@ -418,6 +452,63 @@ export const placesProvider: PlacesProvider = {
       }
     }
     return null;
+  },
+
+  // ── placeDetails: photos + reviews for the in-app detail card ──────────────
+  async placeDetails(place: Place): Promise<PlaceDetails> {
+    const fallbackUrl = mapsSearchUrl(place);
+    const offline = (): PlaceDetails => ({
+      photos: place.photoUrl ? [place.photoUrl] : [],
+      reviews: [],
+      rating: place.rating,
+      userRatingsTotal: place.userRatingsTotal,
+      googleMapsUrl: fallbackUrl,
+      address: place.address,
+      fromPlace: true,
+    });
+
+    if (!features.livePlaces || !place.googlePlaceId) return offline();
+
+    try {
+      const fields = 'rating,user_ratings_total,url,formatted_address,opening_hours,photos,reviews';
+      const url =
+        `${GOOGLE_PLACES_BASE}/place/details/json` +
+        `?place_id=${encodeURIComponent(place.googlePlaceId)}` +
+        `&fields=${encodeURIComponent(fields)}` +
+        `&reviews_sort=most_relevant` +
+        `&key=${serviceConfig.googleApiKey}`;
+      const data = await gFetch<{ status: string; result?: GooglePlaceDetailsResult }>(url);
+      if (data.status !== 'OK' || !data.result) return offline();
+      const r = data.result;
+
+      const photos = (r.photos ?? [])
+        .slice(0, 8)
+        .map((p) => placePhotoUrl(p.photo_reference, 1000));
+      // Keep the curated/list photo first if Google returned none.
+      if (photos.length === 0 && place.photoUrl) photos.push(place.photoUrl);
+
+      const reviews: PlaceReview[] = (r.reviews ?? []).slice(0, 6).map((rv) => ({
+        author: rv.author_name ?? 'Google user',
+        rating: rv.rating ?? 0,
+        text: rv.text ?? '',
+        relativeTime: rv.relative_time_description,
+        profilePhotoUrl: rv.profile_photo_url,
+        authorUrl: rv.author_url,
+      }));
+
+      return {
+        photos,
+        reviews,
+        rating: r.rating ?? place.rating,
+        userRatingsTotal: r.user_ratings_total ?? place.userRatingsTotal,
+        googleMapsUrl: r.url ?? fallbackUrl,
+        address: r.formatted_address ?? place.address,
+        openNow: r.opening_hours?.open_now,
+        fromPlace: false,
+      };
+    } catch {
+      return offline();
+    }
   },
 
   // ── parseSharedList ──────────────────────────────────────────────────────

@@ -402,6 +402,34 @@ export interface GeocodedPoint {
   label: string;
 }
 
+/** One Google review shown on the place-detail sheet. */
+export interface PlaceReview {
+  author: string;
+  /** 1–5. */
+  rating: number;
+  text: string;
+  /** e.g. "2 weeks ago". */
+  relativeTime?: string;
+  profilePhotoUrl?: string;
+  authorUrl?: string;
+}
+
+/** Rich detail for the in-app place card: photos + reviews + live rating. */
+export interface PlaceDetails {
+  /** Photo URLs (Google Place Photo links, or the Place's own photo offline). */
+  photos: string[];
+  reviews: PlaceReview[];
+  rating?: number;
+  userRatingsTotal?: number;
+  /** Deep link to the place on Google Maps. */
+  googleMapsUrl?: string;
+  address?: string;
+  /** Whether the place is open right now, when Google reports it. */
+  openNow?: boolean;
+  /** True when live detail couldn't be fetched and only the Place's own data is shown. */
+  fromPlace?: boolean;
+}
+
 export interface PlacesProvider {
   readonly name: string;
   resolveCity(query: string): Promise<ResolvedCity | null>;
@@ -411,6 +439,8 @@ export interface PlacesProvider {
   geocodeAddress(query: string): Promise<GeocodedPoint | null>;
   search(params: PlaceSearchParams): Promise<Place[]>;
   details(googlePlaceId: string): Promise<Partial<Place> | null>;
+  /** Photos + reviews for a place card (live Place Details; offline = the Place's own data). */
+  placeDetails(place: Place): Promise<PlaceDetails>;
   /** Resolve a shared Google Maps list / saved-places link into Places. */
   parseSharedList(url: string): Promise<ParsedList>;
   suggestFood(params: FoodSearchParams): Promise<Place[]>;

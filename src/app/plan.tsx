@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
-import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan, type LatLng, type RouteLeg } from '@/core';
+import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan, type LatLng, type Place, type RouteLeg } from '@/core';
 import { getLocalDishes } from '@/data';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
@@ -20,6 +20,7 @@ import {
   EmptyState,
   GlassSurface,
   IconSymbol,
+  PlaceDetailSheet,
   Screen,
   Tag,
   Text,
@@ -116,6 +117,13 @@ export default function PlanScreen() {
     },
     [setActiveDay],
   );
+
+  // Tapped place → photos + reviews sheet.
+  const [detailPlace, setDetailPlace] = useState<Place | null>(null);
+  const onOpenDetail = useCallback((place: Place) => {
+    hapticSelection();
+    setDetailPlace(place);
+  }, []);
 
   // Toast
   const toast = useRef(new Animated.Value(0)).current;
@@ -361,6 +369,7 @@ export default function PlanScreen() {
                         onMoveDown={() => onMoveStop(i, i + 1)}
                         canMoveUp={i > 0}
                         canMoveDown={i < day.stops.length - 1}
+                        onPress={() => onOpenDetail(stop.place)}
                       />
                     ))}
                     {endPin ? (
@@ -462,6 +471,9 @@ export default function PlanScreen() {
           </View>
         </GlassSurface>
       </Animated.View>
+
+      {/* Photos + reviews for a tapped stop */}
+      <PlaceDetailSheet place={detailPlace} currency={currency} onClose={() => setDetailPlace(null)} />
     </View>
   );
 }
