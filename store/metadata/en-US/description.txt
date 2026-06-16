@@ -1,0 +1,40 @@
+Gnaver turns your travel wishlist into a working, hour-by-hour schedule — one that actually respects opening hours, adapts to the weather, and inserts meals matched to your taste.
+
+IMPORT OR SEARCH
+Paste a shared Google Maps list link and Gnaver resolves every saved place automatically. Or simply pick a city and let Gnaver find the best places for your interests.
+
+SMART SCHEDULING
+Tell Gnaver how many days you have, your daily hours, your interests (Culture, History, Art, Food, Nature, Beaches, Nightlife, Shopping, Architecture, Religion, Photography, Relaxation, Adventure), your transport mode, and your pace — relaxed, balanced, or packed. Gnaver builds a day-by-day, stop-by-stop roadmap that fits.
+
+OPENING HOURS THAT ACTUALLY WORK
+Gnaver knows the Louvre is closed on Tuesdays. It handles holiday closures, ceremony days, and split opening windows. It will wait for a venue to open if you arrive early, and warns you when you're cutting it close to closing time.
+
+WEATHER-AWARE RE-ROUTING
+If rain is forecast, outdoor stops lose priority and nearby indoor venues become more attractive. You can set your own temperature thresholds — too hot for a midday beach walk, too cold for an open-air market. Gnaver re-routes around the forecast automatically.
+
+TASTE-MATCHED MEALS
+Lunch and dinner are inserted at the right moment, in the right neighbourhood. Gnaver ranks food options by your cuisine preferences, dietary needs, and budget (cheap street food through fine dining). Connect an Anthropic or OpenAI key for conversational taste matching, or use the built-in heuristic ranker — no key needed.
+
+OPTIMISED ROUTE ORDER
+A 2-opt algorithm minimises backtracking across each day's stops without ever violating a constraint. The result is a route that flows geographically, not a random list of attractions.
+
+MARK MUST-SEES
+Flag non-negotiable stops and Gnaver triples their priority in the schedule — they always make the cut.
+
+NATIVE APPLE MAPS VIEW
+The day's route is drawn directly on a full-bleed Apple Maps view in electric blue. Tap any stop to see details.
+
+TIME-BY-TIME TIMELINE
+Every stop shows: arrival and departure time, travel leg from the previous stop, entry price, accepted payment methods (cash, card, Apple Pay…), local currency, and a day-total cost summary.
+
+ONE-TAP GOOGLE MAPS DIRECTIONS
+Each day includes a deep link to Google Maps with all waypoints in order — open it and go.
+
+RE-EDIT ANYTIME
+Deselect a place, add a new one, and Gnaver re-generates the schedule instantly.
+
+NO API KEYS REQUIRED
+Everything runs on realistic sample data. Add a Google Maps Platform key to search live places and get real routing. Add an AI key for conversational taste recommendations. Either way, the optimizer works.
+
+PRIVACY
+Gnaver uses your location only to anchor routes from where you are and to show your position on the map. Location data is never sent to a server without your knowledge.

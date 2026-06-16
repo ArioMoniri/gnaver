@@ -1,0 +1,13 @@
+Version 1.0.0 — Initial release
+
+• Import a Google Maps shared list or search any city
+• Day-by-day, hour-by-hour itinerary optimizer
+• Opening hours with holiday and ceremony exceptions
+• Weather-aware re-routing (rain, heat, cold thresholds)
+• Taste-matched meal insertion (lunch and dinner)
+• 2-opt route polish to minimise backtracking
+• Must-see place priority pinning
+• Native Apple Maps view with route overlay
+• Time-by-time timeline with entry prices and payment methods
+• One-tap Google Maps directions per day
+• Fully functional on sample data — no API keys required

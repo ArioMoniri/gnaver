@@ -1,0 +1,1 @@
+Import your Google Maps saved list and get a weather-aware, opening-hour-respecting day-by-day travel schedule in seconds.

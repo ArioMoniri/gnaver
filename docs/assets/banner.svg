@@ -1,0 +1,135 @@
+<svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gnaver banner">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A0C0F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0D1520;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="routeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0A84FF;stop-opacity:0" />
+      <stop offset="20%" style="stop-color:#0A84FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3D9BFF;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="pinGlow" x="-80%" y="-80%" width="360%" height="360%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <clipPath id="routeClip">
+      <rect x="0" y="0" width="0" height="280">
+        <animate attributeName="width" from="0" to="900" dur="2.4s" begin="0.3s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" />
+      </rect>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="280" fill="url(#bgGrad)" rx="16" />
+
+  <!-- Subtle grid lines (map feel) -->
+  <g stroke="rgba(255,255,255,0.04)" stroke-width="1">
+    <line x1="0" y1="70" x2="900" y2="70"/>
+    <line x1="0" y1="140" x2="900" y2="140"/>
+    <line x1="0" y1="210" x2="900" y2="210"/>
+    <line x1="150" y1="0" x2="150" y2="280"/>
+    <line x1="300" y1="0" x2="300" y2="280"/>
+    <line x1="450" y1="0" x2="450" y2="280"/>
+    <line x1="600" y1="0" x2="600" y2="280"/>
+    <line x1="750" y1="0" x2="750" y2="280"/>
+  </g>
+
+  <!-- Route polyline (animated draw) -->
+  <polyline
+    points="80,200 160,155 245,175 320,120 410,140 490,90 570,115 650,80 740,105 820,75"
+    fill="none"
+    stroke="url(#routeGrad)"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#glow)"
+    clip-path="url(#routeClip)"
+  />
+
+  <!-- Pin 1 -->
+  <g filter="url(#pinGlow)" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0.6s" fill="freeze"/>
+    <circle cx="160" cy="155" r="8" fill="#0A84FF"/>
+    <circle cx="160" cy="155" r="4" fill="#FFFFFF"/>
+    <circle cx="160" cy="155" r="14" fill="none" stroke="#0A84FF" stroke-width="1.5" opacity="0.4">
+      <animate attributeName="r" from="8" to="20" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.4" to="0" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Pin 2 -->
+  <g filter="url(#pinGlow)" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.0s" fill="freeze"/>
+    <circle cx="410" cy="140" r="8" fill="#0A84FF"/>
+    <circle cx="410" cy="140" r="4" fill="#FFFFFF"/>
+    <circle cx="410" cy="140" r="14" fill="none" stroke="#0A84FF" stroke-width="1.5" opacity="0.4">
+      <animate attributeName="r" from="8" to="20" dur="1.2s" begin="1.0s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.4" to="0" dur="1.2s" begin="1.0s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Pin 3 (food - orange) -->
+  <g filter="url(#pinGlow)" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.4s" fill="freeze"/>
+    <circle cx="570" cy="115" r="8" fill="#FF7A00"/>
+    <circle cx="570" cy="115" r="4" fill="#FFFFFF"/>
+    <circle cx="570" cy="115" r="14" fill="none" stroke="#FF7A00" stroke-width="1.5" opacity="0.4">
+      <animate attributeName="r" from="8" to="20" dur="1.2s" begin="1.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.4" to="0" dur="1.2s" begin="1.4s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Pin 4 (destination) -->
+  <g filter="url(#pinGlow)" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.8s" fill="freeze"/>
+    <circle cx="820" cy="75" r="10" fill="#0A84FF"/>
+    <circle cx="820" cy="75" r="5" fill="#FFFFFF"/>
+    <circle cx="820" cy="75" r="18" fill="none" stroke="#0A84FF" stroke-width="2" opacity="0.4">
+      <animate attributeName="r" from="10" to="26" dur="1.4s" begin="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.4" to="0" dur="1.4s" begin="1.8s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Glass card behind wordmark -->
+  <rect x="32" y="28" width="340" height="100" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+
+  <!-- Wordmark -->
+  <text x="60" y="82" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="48" font-weight="700" letter-spacing="-1" fill="#F4F6F8" opacity="0">
+    Gnaver
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.1s" fill="freeze"/>
+  </text>
+  <text x="60" y="112" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif" font-size="15" font-weight="400" letter-spacing="0.5" fill="rgba(174,183,194,0.9)" opacity="0">
+    AI-Powered Travel Itinerary Optimizer
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.4s" fill="freeze"/>
+  </text>
+
+  <!-- Accent line under wordmark -->
+  <rect x="60" y="120" width="0" height="2" rx="1" fill="#0A84FF" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.1s" begin="0.4s" fill="freeze"/>
+    <animate attributeName="width" from="0" to="200" dur="0.6s" begin="0.4s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1"/>
+  </rect>
+
+  <!-- Badge pills -->
+  <g opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.0s" fill="freeze"/>
+    <rect x="60" y="148" width="72" height="24" rx="12" fill="rgba(10,132,255,0.18)" stroke="rgba(10,132,255,0.4)" stroke-width="1"/>
+    <text x="96" y="164" font-family="-apple-system, sans-serif" font-size="11" font-weight="500" fill="#0A84FF" text-anchor="middle">Expo SDK 56</text>
+
+    <rect x="142" y="148" width="60" height="24" rx="12" fill="rgba(47,180,99,0.15)" stroke="rgba(47,180,99,0.4)" stroke-width="1"/>
+    <text x="172" y="164" font-family="-apple-system, sans-serif" font-size="11" font-weight="500" fill="#2FB463" text-anchor="middle">44 Tests</text>
+
+    <rect x="212" y="148" width="76" height="24" rx="12" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="250" y="164" font-family="-apple-system, sans-serif" font-size="11" font-weight="500" fill="rgba(174,183,194,0.9)" text-anchor="middle">TypeScript 6</text>
+  </g>
+
+  <!-- Bottom caption -->
+  <text x="450" y="262" font-family="-apple-system, 'SF Pro Text', sans-serif" font-size="12" font-weight="400" fill="rgba(107,116,128,0.8)" text-anchor="middle" opacity="0">
+    Map-first Minimal · Apple Maps · Weather-aware routing · Opening hours · Meals
+    <animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="2.0s" fill="freeze"/>
+  </text>
+</svg>
