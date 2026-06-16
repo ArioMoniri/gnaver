@@ -110,15 +110,21 @@ function dwellFor(place: Place, prefs: TripPreferences): number {
   return Math.round(place.dwellMinutes * PACE_DWELL_FACTOR[prefs.pace]);
 }
 
-/** Try to schedule `place` arriving from `pos` at `time`; null if infeasible. */
+/**
+ * Try to schedule `place` arriving from `pos` at `time`; null if infeasible.
+ * `pos` is null only for the very first stop of a day that has no fixed start
+ * point — in that case there is no travel leg (you simply begin there).
+ */
 function tryStop(
   place: Place,
-  pos: LatLng,
+  pos: LatLng | null,
   time: number,
   ctx: DayContext,
   isFood: boolean,
 ): BuiltStop | null {
-  const leg = ctx.travel(pos, place.location, ctx.prefs.transport);
+  const leg: RouteLeg = pos
+    ? ctx.travel(pos, place.location, ctx.prefs.transport)
+    : { mode: 'walk', distanceMeters: 0, durationMinutes: 0 };
 
   if (
     ctx.prefs.maxWalkMinutes != null &&
@@ -169,7 +175,7 @@ function tryStop(
  * detour, but will travel further rather than skip a meal — people eat.
  * Candidates arrive pre-ranked by taste, so the first feasible is the best.
  */
-function pickMeal(pos: LatLng, time: number, dwell: number, ctx: DayContext): BuiltStop | null {
+function pickMeal(pos: LatLng | null, time: number, dwell: number, ctx: DayContext): BuiltStop | null {
   let fallback: BuiltStop | null = null;
   for (const cand of ctx.food) {
     const meal: Place = { ...cand, dwellMinutes: dwell, isFood: true };
@@ -187,14 +193,10 @@ function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: S
   const eaten = { lunch: false, dinner: false };
   const includeFood = ctx.prefs.includeFood && ctx.food.length > 0;
 
-  let pos: LatLng = ctx.window.startLocation ?? pool[0]?.location ?? { lat: 0, lng: 0 };
+  // null start = no fixed day-start point; the first chosen stop begins the day
+  // with a zero travel leg. Same anchoring is used by `simulate` (2-opt).
+  let pos: LatLng | null = ctx.window.startLocation ?? null;
   let time = ctx.startMinutes;
-
-  // If the day has no explicit start point, anchor on the highest-value place
-  // so the first leg isn't from an arbitrary (0,0).
-  if (!ctx.window.startLocation && pool.length > 0) {
-    pos = pool.slice().sort((a, b) => baseValue(b, ctx.prefs) - baseValue(a, ctx.prefs))[0].location;
-  }
 
   for (let guard = 0; guard < 60; guard++) {
     // Eat lunch at the first free moment after noon (before dinner time).
@@ -250,9 +252,9 @@ function buildDay(pool: Place[], ctx: DayContext): { stops: BuiltStop[]; used: S
 
 function simulate(order: Place[], ctx: DayContext): BuiltStop[] | null {
   const stops: BuiltStop[] = [];
-  let pos = ctx.window.startLocation ?? order[0]?.location;
+  // Mirror buildDay exactly: null start → first stop has a zero leg.
+  let pos: LatLng | null = ctx.window.startLocation ?? null;
   let time = ctx.startMinutes;
-  if (!pos) return null;
   for (const place of order) {
     const stop = tryStop(place, pos, time, ctx, !!place.isFood);
     if (!stop) return null; // ordering is infeasible
@@ -310,7 +312,8 @@ function toScheduledStop(b: BuiltStop): ScheduledStop {
     departureMinutes: b.departureMinutes,
     arrival: formatMinutes(b.entryMinutes),
     departure: formatMinutes(b.departureMinutes),
-    legToHere: b.leg,
+    // Omit the phantom zero leg when a day has no fixed start point.
+    legToHere: b.leg.distanceMeters === 0 && b.leg.durationMinutes === 0 ? undefined : b.leg,
     waitMinutes: b.waitMinutes || undefined,
     warnings: b.warnings.length ? b.warnings : undefined,
     isFood: b.isFood || undefined,

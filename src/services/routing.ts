@@ -187,7 +187,11 @@ export const routingProvider: RoutingProvider = {
  * Lookup is O(1) via a Map keyed on rounded coordinates. Cache misses fall
  * back to estimateLeg so the optimizer can never throw.
  */
-export function buildTravelFn(points: LatLng[], legs: RouteLeg[][]): TravelFn {
+export function buildTravelFn(
+  points: LatLng[],
+  legs: RouteLeg[][],
+  matrixMode: TransportMode,
+): TravelFn {
   // Round to 5 decimal places (~1 m precision) to make floating-point keys safe.
   const key = (p: LatLng): string => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
   const cache = new Map<string, RouteLeg>();
@@ -195,13 +199,15 @@ export function buildTravelFn(points: LatLng[], legs: RouteLeg[][]): TravelFn {
   for (let i = 0; i < points.length; i++) {
     for (let j = 0; j < points.length; j++) {
       if (legs[i]?.[j]) {
-        cache.set(`${key(points[i])}|${key(points[j])}`, legs[i][j]);
+        // Mode is part of the key: a query for a different mode correctly
+        // misses and falls back to an estimate rather than returning wrong data.
+        cache.set(`${matrixMode}|${key(points[i])}|${key(points[j])}`, legs[i][j]);
       }
     }
   }
 
   return (from: LatLng, to: LatLng, mode: TransportMode): RouteLeg => {
-    const k = `${key(from)}|${key(to)}`;
+    const k = `${mode}|${key(from)}|${key(to)}`;
     return cache.get(k) ?? estimateLeg(from, to, mode);
   };
 }

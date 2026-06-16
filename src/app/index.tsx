@@ -4,7 +4,7 @@
  * trip store from saved settings on mount and pushes to /select when ready.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -384,22 +384,16 @@ export default function NewTripScreen() {
                   Weave in cafés and restaurants around mealtimes.
                 </Text>
               </View>
-              <Pressable
-                accessibilityRole="switch"
-                accessibilityState={{ checked: prefs.includeFood }}
-                onPress={() => {
+              <Switch
+                value={prefs.includeFood}
+                onValueChange={(v) => {
                   hapticSelection();
-                  trip.setPreferences({ includeFood: !prefs.includeFood });
+                  trip.setPreferences({ includeFood: v });
                 }}
-                style={[
-                  styles.switch,
-                  {
-                    backgroundColor: prefs.includeFood ? theme.colors.accent : theme.colors.border,
-                  },
-                ]}
-              >
-                <View style={[styles.knob, { transform: [{ translateX: prefs.includeFood ? 20 : 0 }] }]} />
-              </Pressable>
+                trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+                thumbColor={theme.colors.surfaceElevated}
+                ios_backgroundColor={theme.colors.border}
+              />
             </View>
 
             {prefs.includeFood ? (
@@ -529,19 +523,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  switch: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    padding: 4,
-    justifyContent: 'center',
-  },
-  knob: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
   },
   cta: {
     position: 'absolute',

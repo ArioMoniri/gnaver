@@ -143,7 +143,8 @@ export default function SettingsScreen() {
               value={s.includeFood}
               onValueChange={(includeFood) => s.set({ includeFood })}
               trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-              thumbColor="#FFFFFF"
+              thumbColor={theme.colors.surfaceElevated}
+              ios_backgroundColor={theme.colors.border}
             />
           </View>
 
@@ -186,7 +187,8 @@ export default function SettingsScreen() {
               value={s.avoidRain}
               onValueChange={(avoidRain) => s.set({ avoidRain })}
               trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-              thumbColor="#FFFFFF"
+              thumbColor={theme.colors.surfaceElevated}
+              ios_backgroundColor={theme.colors.border}
             />
           </View>
           <View style={styles.stepperField}>

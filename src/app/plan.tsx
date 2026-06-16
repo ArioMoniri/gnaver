@@ -142,7 +142,7 @@ export default function PlanScreen() {
         <View style={[styles.backChip, { top: insets.top + 8 }]}>
           <GlassCard padding="none" radius="pill" floating style={styles.backChipInner}>
             <Button
-              title={title}
+              title={title.length > 22 ? `${title.slice(0, 20).trimEnd()}…` : title}
               variant="ghost"
               size="sm"
               icon="chevron.left"
@@ -172,9 +172,9 @@ export default function PlanScreen() {
             <>
               {/* Summary chips */}
               <View style={styles.summaryRow}>
-                <Tag label={formatDistance(day.totalDistanceMeters)} tone="accent" icon="arrow.triangle.turn.up.right.diamond.fill" iconFallback="↝" />
+                <Tag label={formatCostSummary(day.totalCost)} tone="accent" icon="eurosign.circle.fill" iconFallback="€" />
+                <Tag label={formatDistance(day.totalDistanceMeters)} tone="neutral" icon="arrow.triangle.turn.up.right.diamond.fill" iconFallback="↝" />
                 <Tag label={formatDuration(day.totalTravelMinutes)} tone="neutral" icon="figure.walk" iconFallback="🚶" />
-                <Tag label={formatCostSummary(day.totalCost)} tone="neutral" icon="eurosign.circle" iconFallback="€" />
                 {day.weather ? <WeatherPill weather={day.weather} /> : null}
               </View>
 
@@ -236,7 +236,7 @@ export default function PlanScreen() {
           {tripUnscheduled > 0 ? (
             <View style={[styles.tripUnsched, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}>
               <Text variant="footnote" tone="secondary" align="center">
-                {tripUnscheduled} {tripUnscheduled === 1 ? 'place' : 'places'} across the trip couldn’t be scheduled in your window.
+                {tripUnscheduled} {tripUnscheduled === 1 ? 'place' : 'places'} didn’t fit your time window.
               </Text>
             </View>
           ) : null}

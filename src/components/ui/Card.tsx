@@ -2,7 +2,7 @@
  * Opaque elevated surface for content that doesn't sit over the map.
  */
 import { type ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme';
 
@@ -43,7 +43,7 @@ export function Card({
           padding: pad,
         },
         elevated && theme.elevation.card,
-        bordered && { borderWidth: 1, borderColor: theme.colors.border },
+        bordered && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
         style,
       ]}
     >

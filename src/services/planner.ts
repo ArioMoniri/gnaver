@@ -85,7 +85,7 @@ export async function generateItinerary(
   if (!aborted() && pointSet.length > 0) {
     try {
       const matrix = await routingProvider.matrix(pointSet, trip.preferences.transport);
-      travel = buildTravelFn(pointSet, matrix);
+      travel = buildTravelFn(pointSet, matrix, trip.preferences.transport);
     } catch {
       travel = estimateLeg;
     }
@@ -107,13 +107,15 @@ export async function generateItinerary(
             centroid(dayPlaceLocations) ??
             forecastCenter;
 
+          // Don't pre-filter by open-now at the day's *start* (e.g. 9am) — that
+          // wrongly drops dinner-only spots. The optimizer's evaluateVisit checks
+          // each candidate's hours at the actual meal time, so fetch broadly.
           const candidates = await placesProvider.suggestFood({
             near,
             budget: trip.preferences.foodBudget,
             cuisine: trip.preferences.cuisinePrefs,
             dietary: trip.preferences.dietary,
             date: day.date,
-            atMinutes: day.startMinutes,
             limit: 20,
           });
 
