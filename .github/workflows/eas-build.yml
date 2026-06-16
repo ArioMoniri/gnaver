@@ -1,0 +1,44 @@
+name: EAS Build & Submit (iOS)
+
+# Manual pipeline for App Store builds. Requires an EXPO_TOKEN repo secret
+# (Settings → Secrets → Actions). Apple credentials are configured once via
+# `eas credentials` / EAS-managed credentials. See docs/APP_STORE.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        options: [preview, production]
+        default: production
+      submit:
+        description: Submit to App Store Connect after build
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: EAS build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      - name: Build (iOS)
+        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive --no-wait
+
+      - name: Submit (optional)
+        if: ${{ inputs.submit }}
+        run: eas submit --platform ios --latest --non-interactive
