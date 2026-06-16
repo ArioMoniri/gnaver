@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { formatMinutes, type FoodBudget, type Interest, type Pace, type TransportMode } from '@/core';
 import { listCities } from '@/data';
@@ -32,6 +33,10 @@ import {
 } from '@/components';
 
 type Mode = 'city' | 'link';
+
+const ONBOARDED_KEY = 'gnaver.onboarded';
+
+const CUISINE_OPTIONS = ['Local', 'Italian', 'Japanese', 'Vegetarian', 'Seafood', 'Street food'];
 
 const TRANSPORT_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: 'walk', label: 'Walk' },
@@ -65,6 +70,39 @@ export default function NewTripScreen() {
 
   const [mode, setMode] = useState<Mode>('city');
   const [linkUrl, setLinkUrl] = useState('');
+  const [cityQuery, setCityQuery] = useState('');
+  const [cuisineDraft, setCuisineDraft] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // First-run onboarding triptych (one-row, AsyncStorage flag).
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(ONBOARDED_KEY)
+      .then((v) => {
+        if (mounted && !v) setShowOnboarding(true);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const dismissOnboarding = useCallback(() => {
+    hapticSelection();
+    setShowOnboarding(false);
+    void AsyncStorage.setItem(ONBOARDED_KEY, '1').catch(() => {});
+  }, []);
+
+  // Continuous spin for the inline "finding city" indicator.
+  const spinValue = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spinValue, { toValue: 1, duration: 900, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spinValue]);
+  const spin = spinValue.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   // Seed trip store from saved settings once they've hydrated.
   useEffect(() => {
@@ -131,6 +169,52 @@ export default function NewTripScreen() {
     router.push('/select');
   }, [canContinue, router]);
 
+  const onSearchCity = useCallback(() => {
+    const q = cityQuery.trim();
+    if (!q) return;
+    hapticSelection();
+    void trip.startFromCityQuery(q);
+  }, [cityQuery, trip]);
+
+  const onPickCity = useCallback(
+    (id: string, name: string) => {
+      hapticSelection();
+      setCityQuery(name);
+      void trip.startFromCity(id);
+    },
+    [trip],
+  );
+
+  const cuisinePrefs = useMemo(() => prefs.cuisinePrefs ?? [], [prefs.cuisinePrefs]);
+  const toggleCuisine = useCallback(
+    (cuisine: string) => {
+      const has = cuisinePrefs.includes(cuisine);
+      const next = has ? cuisinePrefs.filter((c) => c !== cuisine) : [...cuisinePrefs, cuisine];
+      trip.setPreferences({ cuisinePrefs: next });
+    },
+    [cuisinePrefs, trip],
+  );
+
+  const addCuisine = useCallback(() => {
+    const c = cuisineDraft.trim();
+    if (!c) return;
+    if (!cuisinePrefs.some((x) => x.toLowerCase() === c.toLowerCase())) {
+      hapticSelection();
+      trip.setPreferences({ cuisinePrefs: [...cuisinePrefs, c] });
+    }
+    setCuisineDraft('');
+  }, [cuisineDraft, cuisinePrefs, trip]);
+
+  const quickBites = (prefs.maxWalkMinutes ?? 0) > 0;
+  const toggleQuickBites = useCallback(
+    (v: boolean) => {
+      hapticSelection();
+      // "Quick bites" caps walking time so the optimiser favours nearby, fast food.
+      trip.setPreferences({ maxWalkMinutes: v ? 12 : undefined });
+    },
+    [trip],
+  );
+
   return (
     <View style={styles.root}>
       {/* Hero background wash */}
@@ -172,6 +256,9 @@ export default function NewTripScreen() {
             <Text variant="callout" tone="secondary" style={{ marginTop: theme.spacing.sm }}>
               Turn a wishlist into the perfect day-by-day route.
             </Text>
+            <Text variant="footnote" tone="tertiary" style={{ marginTop: 4 }}>
+              AI-optimized routes · Weather-aware{'\n'}Built from your Google Maps lists
+            </Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -190,6 +277,29 @@ export default function NewTripScreen() {
           </Pressable>
         </View>
 
+        {/* First-run onboarding triptych */}
+        {showOnboarding ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss intro"
+            onPress={dismissOnboarding}
+            style={{ marginTop: theme.spacing.xl }}
+          >
+            <GlassCard padding="md" radius="xl" floating>
+              <View style={styles.onboardRow}>
+                <OnboardCell emoji="🗺" text="Your saved places" />
+                <View style={[styles.onboardDivider, { backgroundColor: theme.colors.glassBorder }]} />
+                <OnboardCell emoji="🤖" text="AI optimizes the day" />
+                <View style={[styles.onboardDivider, { backgroundColor: theme.colors.glassBorder }]} />
+                <OnboardCell emoji="📍" text="Time-by-time route" />
+              </View>
+              <Text variant="caption" tone="onGlassSecondary" align="center" style={{ marginTop: theme.spacing.sm }}>
+                Tap to dismiss
+              </Text>
+            </GlassCard>
+          </Pressable>
+        ) : null}
+
         {/* Source mode */}
         <View style={{ marginTop: theme.spacing.xl }}>
           <Segmented<Mode>
@@ -203,24 +313,82 @@ export default function NewTripScreen() {
         </View>
 
         {mode === 'city' ? (
-          <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.md }}>
-            {cities.map((city) => {
-              const active = trip.cityId === city.id && trip.source === 'city';
-              return (
-                <CityCard
-                  key={city.id}
-                  emoji={city.emoji}
-                  name={city.name}
-                  country={city.country}
-                  blurb={city.blurb}
-                  active={active}
-                  onPress={() => {
-                    hapticSelection();
-                    void trip.startFromCity(city.id);
-                  }}
+          <View style={{ marginTop: theme.spacing.lg }}>
+            <GlassCard padding="lg" radius="xl" floating>
+              <Text variant="subhead" weight="600">
+                Search any city
+              </Text>
+              <Text variant="footnote" tone="onGlassSecondary" style={{ marginTop: 2 }}>
+                Type a destination — anywhere in the world.
+              </Text>
+              <View
+                style={[
+                  styles.inputRow,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+                ]}
+              >
+                <IconSymbol name="magnifyingglass" size={16} color={theme.colors.textTertiary} fallbackGlyph="⌕" />
+                <TextInput
+                  value={cityQuery}
+                  onChangeText={setCityQuery}
+                  onSubmitEditing={onSearchCity}
+                  placeholder="Search any city…"
+                  placeholderTextColor={theme.colors.textTertiary}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  style={[styles.input, { color: theme.colors.text }]}
                 />
-              );
-            })}
+                {cityQuery.trim() ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="Search city" hitSlop={8} onPress={onSearchCity}>
+                    <Text variant="footnote" weight="600" tone="accent">
+                      Search
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {loadingLink ? (
+                <View style={[styles.loadedRow, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+                  <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                    <IconSymbol name="arrow.triangle.2.circlepath" size={15} color={theme.colors.accent} fallbackGlyph="↻" />
+                  </Animated.View>
+                  <Text variant="footnote" weight="600" tone="accent" numberOfLines={1} style={{ flex: 1 }}>
+                    Finding {cityQuery.trim() || 'your city'}…
+                  </Text>
+                </View>
+              ) : trip.status === 'error' && trip.error ? (
+                <Text variant="footnote" tone="danger" style={{ marginTop: theme.spacing.sm }}>
+                  {trip.error}
+                </Text>
+              ) : cityChosen ? (
+                <View style={[styles.loadedRow, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+                  <IconSymbol name="checkmark.circle.fill" size={16} color={theme.colors.accent} />
+                  <Text variant="footnote" weight="600" tone="accent" numberOfLines={1} style={{ flex: 1 }}>
+                    {trip.title} · {trip.candidates.length} places
+                  </Text>
+                </View>
+              ) : null}
+
+              <Text variant="caption" tone="onGlassSecondary" weight="700" style={styles.suggestLabel}>
+                POPULAR CITIES
+              </Text>
+              <View style={styles.suggestWrap}>
+                {cities.map((city) => {
+                  const active = trip.cityId === city.id && trip.source === 'city';
+                  return (
+                    <Chip
+                      key={city.id}
+                      label={city.name}
+                      emoji={city.emoji}
+                      size="sm"
+                      selected={active}
+                      onPress={() => onPickCity(city.id, city.name)}
+                    />
+                  );
+                })}
+              </View>
+            </GlassCard>
           </View>
         ) : (
           <View style={{ marginTop: theme.spacing.lg }}>
@@ -384,14 +552,84 @@ export default function NewTripScreen() {
             </View>
 
             {prefs.includeFood ? (
-              <View style={styles.field}>
-                <SectionLabel theme={theme}>Food budget</SectionLabel>
-                <Segmented<FoodBudget>
-                  options={BUDGET_OPTIONS}
-                  value={prefs.foodBudget ?? 'mid'}
-                  onChange={(foodBudget) => trip.setPreferences({ foodBudget })}
-                />
-              </View>
+              <>
+                <View style={styles.field}>
+                  <SectionLabel theme={theme}>Food budget</SectionLabel>
+                  <Segmented<FoodBudget>
+                    options={BUDGET_OPTIONS}
+                    value={prefs.foodBudget ?? 'mid'}
+                    onChange={(foodBudget) => trip.setPreferences({ foodBudget })}
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <SectionLabel theme={theme}>Cuisines</SectionLabel>
+                  <View style={styles.chipWrap}>
+                    {CUISINE_OPTIONS.map((c) => (
+                      <Chip
+                        key={c}
+                        label={c}
+                        size="sm"
+                        selected={cuisinePrefs.some((x) => x.toLowerCase() === c.toLowerCase())}
+                        onPress={() => toggleCuisine(c)}
+                      />
+                    ))}
+                  </View>
+                  {cuisinePrefs.filter((c) => !CUISINE_OPTIONS.some((o) => o.toLowerCase() === c.toLowerCase())).length > 0 ? (
+                    <View style={[styles.chipWrap, { marginTop: theme.spacing.sm }]}>
+                      {cuisinePrefs
+                        .filter((c) => !CUISINE_OPTIONS.some((o) => o.toLowerCase() === c.toLowerCase()))
+                        .map((c) => (
+                          <Chip key={c} label={c} size="sm" selected onPress={() => toggleCuisine(c)} />
+                        ))}
+                    </View>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.inputRow,
+                      { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+                    ]}
+                  >
+                    <IconSymbol name="fork.knife" size={15} color={theme.colors.textTertiary} fallbackGlyph="🍴" />
+                    <TextInput
+                      value={cuisineDraft}
+                      onChangeText={setCuisineDraft}
+                      onSubmitEditing={addCuisine}
+                      placeholder="Add a cuisine…"
+                      placeholderTextColor={theme.colors.textTertiary}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      style={[styles.input, { color: theme.colors.text }]}
+                    />
+                    {cuisineDraft.trim() ? (
+                      <Pressable accessibilityRole="button" accessibilityLabel="Add cuisine" hitSlop={8} onPress={addCuisine}>
+                        <Text variant="footnote" weight="600" tone="accent">
+                          Add
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View style={[styles.foodToggleRow, styles.field]}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="subhead" weight="600">
+                      Quick bites
+                    </Text>
+                    <Text variant="caption" tone="onGlassSecondary">
+                      Favour fast, nearby food over long sit-downs.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={quickBites}
+                    onValueChange={toggleQuickBites}
+                    trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+                    thumbColor={theme.colors.surfaceElevated}
+                    ios_backgroundColor={theme.colors.border}
+                  />
+                </View>
+              </>
             ) : null}
           </GlassCard>
         </View>
@@ -416,76 +654,14 @@ export default function NewTripScreen() {
   );
 }
 
-function CityCard({
-  emoji,
-  name,
-  country,
-  blurb,
-  active,
-  onPress,
-}: {
-  emoji: string;
-  name: string;
-  country: string;
-  blurb: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
-  const animateTo = (to: number) =>
-    Animated.spring(scale, {
-      toValue: to,
-      useNativeDriver: true,
-      damping: theme.motion.springBouncy.damping,
-      stiffness: theme.motion.springBouncy.stiffness,
-      mass: theme.motion.springBouncy.mass,
-    }).start();
-
+function OnboardCell({ emoji, text }: { emoji: string; text: string }) {
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: active }}
-        onPress={onPress}
-        onPressIn={() => animateTo(0.97)}
-        onPressOut={() => animateTo(1)}
-      >
-        <GlassCard
-          padding="md"
-          radius="lg"
-          floating={active}
-          style={active ? { borderColor: theme.colors.accent, borderWidth: 1.5 } : undefined}
-        >
-          <View style={styles.cityRow}>
-            <View style={[styles.cityEmojiWrap, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
-              <Text style={styles.cityEmoji}>{emoji}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.cityTitleRow}>
-                <Text variant="headline">{name}</Text>
-                <Text variant="footnote" tone="onGlassSecondary">
-                  {country}
-                </Text>
-              </View>
-              <Text variant="footnote" tone="onGlassSecondary" numberOfLines={2} style={{ marginTop: 2 }}>
-                {blurb}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radio,
-                active
-                  ? { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent }
-                  : { borderColor: theme.colors.glassBorder },
-              ]}
-            >
-              {active ? <IconSymbol name="checkmark" size={13} color={theme.colors.onAccent} weight="bold" /> : null}
-            </View>
-          </View>
-        </GlassCard>
-      </Pressable>
-    </Animated.View>
+    <View style={styles.onboardCell}>
+      <Text style={styles.onboardEmoji}>{emoji}</Text>
+      <Text variant="caption" tone="onGlass" weight="600" align="center" style={{ marginTop: 4 }}>
+        {text}
+      </Text>
+    </View>
   );
 }
 
@@ -541,32 +717,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cityRow: {
+  onboardRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  onboardCell: {
+    flex: 1,
     alignItems: 'center',
-    gap: 14,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 4,
   },
-  cityEmojiWrap: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+  onboardEmoji: {
+    fontSize: 22,
   },
-  cityEmoji: {
-    fontSize: 28,
+  onboardDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    marginVertical: 2,
   },
-  cityTitleRow: {
+  suggestLabel: {
+    marginTop: 18,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  suggestWrap: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    flexWrap: 'wrap',
     gap: 8,
-  },
-  radio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   inputRow: {
     flexDirection: 'row',

@@ -3,14 +3,14 @@
  * strip, then a sheet with the day summary and the time-by-time timeline. Open
  * the route in Google Maps or copy the link; edit places or start over.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
-import { formatCostSummary, formatDistance, formatDuration, type DayPlan } from '@/core';
+import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan } from '@/core';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
 import {
@@ -46,9 +46,18 @@ export default function PlanScreen() {
   const currency = useTrip((s) => s.currency);
   const title = useTrip((s) => s.title);
   const setActiveDay = useTrip((s) => s.setActiveDay);
+  const reorderStops = useTrip((s) => s.reorderStops);
   const reset = useTrip((s) => s.reset);
 
   const mapHeight = Math.round(Dimensions.get('window').height * MAP_RATIO);
+  // Clear the Dynamic Island for any chip floating over the map.
+  const chipTop = Math.max(insets.top + 8, 74);
+
+  // Measure the pinned action bar so the sheet/toast clear it exactly.
+  const [actionBarHeight, setActionBarHeight] = useState(96);
+  const onActionBarLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
+    setActionBarHeight(e.nativeEvent.layout.height);
+  }, []);
 
   const days = itinerary?.days ?? [];
   const safeDay = Math.min(activeDay, Math.max(0, days.length - 1));
@@ -87,6 +96,40 @@ export default function PlanScreen() {
     },
     [toast],
   );
+
+  // "What the AI did" toast — show once when the freshly-optimised plan opens.
+  const announced = useRef(false);
+  useEffect(() => {
+    if (announced.current) return;
+    if (itinerary && days.length > 0) {
+      announced.current = true;
+      const t = setTimeout(() => showToast('Sorted by travel time + weather + your pace'), 360);
+      return () => clearTimeout(t);
+    }
+  }, [itinerary, days.length, showToast]);
+
+  const onMoveStop = useCallback(
+    (from: number, to: number) => {
+      hapticSelection();
+      reorderStops(safeDay, from, to);
+    },
+    [reorderStops, safeDay],
+  );
+
+  const onShare = useCallback(async () => {
+    if (!day) return;
+    hapticImpact(ImpactFeedbackStyle.Medium);
+    const header = `${title} · Day ${safeDay + 1} — ${formatDateLabel(day.date)}`;
+    const lines = day.stops.map(
+      (s, i) => `${i + 1}. ${formatMinutes(s.arrivalMinutes)}  ${s.place.name}`,
+    );
+    const message = [header, '', ...lines, '', day.googleMapsUrl].join('\n');
+    try {
+      await Share.share({ message });
+    } catch {
+      /* user cancelled */
+    }
+  }, [day, safeDay, title]);
 
   const onOpenMaps = useCallback(async () => {
     if (!day?.googleMapsUrl) return;
@@ -153,7 +196,7 @@ export default function PlanScreen() {
         />
 
         {/* Back chip floating over the map */}
-        <View style={[styles.backChip, { top: insets.top + 8 }]}>
+        <View style={[styles.backChip, { top: chipTop }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()}>
             <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false} floating>
               <View style={styles.backInner}>
@@ -167,8 +210,9 @@ export default function PlanScreen() {
         </View>
       </View>
 
-      {/* Floating day strip overlapping the map's bottom edge */}
-      <View style={[styles.stripWrap, { top: mapHeight - 34 }]}>
+      {/* Day strip — inline (not absolute), overlapping the map's bottom edge as
+          a glass bar so it never collides with the sheet content below it. */}
+      <View style={styles.stripWrap}>
         <DayTabStrip days={days} activeDay={safeDay} onSelect={onSelectDay} />
       </View>
 
@@ -180,35 +224,38 @@ export default function PlanScreen() {
             backgroundColor: theme.colors.background,
             borderTopLeftRadius: theme.radius.xl,
             borderTopRightRadius: theme.radius.xl,
-            marginTop: -26,
+            marginTop: -8,
           },
         ]}
       >
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.lg,
-            paddingTop: theme.spacing.xxl,
-            paddingBottom: insets.bottom + 108,
+            paddingTop: theme.spacing.xl,
+            paddingBottom: actionBarHeight + theme.spacing.lg,
           }}
           showsVerticalScrollIndicator={false}
         >
           {day ? (
             <>
-              {/* Cost hero + supporting chips */}
+              {/* Cost hero, then a single horizontal-scroll chip row (no collisions). */}
               <View style={styles.summaryWrap}>
-                <View>
-                  <Text variant="caption" tone="tertiary" weight="700" style={styles.summaryLabel}>
-                    DAY COST
-                  </Text>
-                  <Text variant="title" tone="accent">
-                    {formatCostSummary(day.totalCost)}
-                  </Text>
-                </View>
-                <View style={styles.summaryChips}>
+                <Text variant="caption" tone="tertiary" weight="700" style={styles.summaryLabel}>
+                  DAY COST
+                </Text>
+                <Text variant="title" tone="accent">
+                  {formatCostSummary(day.totalCost)}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.summaryChips}
+                  style={{ marginTop: theme.spacing.md }}
+                >
                   <Tag label={formatDistance(day.totalDistanceMeters)} tone="neutral" icon="arrow.triangle.turn.up.right.diamond.fill" iconFallback="↝" />
                   <Tag label={formatDuration(day.totalTravelMinutes)} tone="neutral" icon="figure.walk" iconFallback="🚶" />
                   {day.weather ? <WeatherPill weather={day.weather} /> : null}
-                </View>
+                </ScrollView>
               </View>
 
               {day.warnings && day.warnings.length > 0 ? (
@@ -222,6 +269,14 @@ export default function PlanScreen() {
 
               {/* Timeline */}
               <View style={{ marginTop: theme.spacing.xl }}>
+                {day.stops.length > 1 ? (
+                  <View style={styles.reorderHint}>
+                    <IconSymbol name="arrow.up.arrow.down" size={12} color={theme.colors.textTertiary} fallbackGlyph="↕" />
+                    <Text variant="caption" tone="tertiary">
+                      You can reorder — the day re-times instantly.
+                    </Text>
+                  </View>
+                ) : null}
                 {day.stops.length === 0 ? (
                   <Text variant="callout" tone="secondary" align="center" style={{ paddingVertical: theme.spacing.xxl }}>
                     Nothing scheduled for this day.
@@ -234,6 +289,10 @@ export default function PlanScreen() {
                       index={i}
                       currency={currency}
                       isLast={i === day.stops.length - 1}
+                      onMoveUp={() => onMoveStop(i, i - 1)}
+                      onMoveDown={() => onMoveStop(i, i + 1)}
+                      canMoveUp={i > 0}
+                      canMoveDown={i < day.stops.length - 1}
                     />
                   ))
                 )}
@@ -263,23 +322,28 @@ export default function PlanScreen() {
         </ScrollView>
       </View>
 
-      {/* Sticky glass action bar */}
-      <View style={[styles.actionBarWrap, { paddingBottom: insets.bottom + theme.spacing.sm, paddingHorizontal: theme.spacing.lg }]}>
-        <GlassSurface variant="bar" radius="xxl" padding="sm" floating style={styles.actionBar}>
-          <Button
-            title="Open in Google Maps"
-            icon="map.fill"
-            iconFallback="🗺"
-            onPress={onOpenMaps}
-            style={{ flex: 1 }}
-          />
-          <Pressable accessibilityRole="button" accessibilityLabel="Copy day link" onPress={onCopyLink}>
-            <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false}>
-              <View style={styles.copyBtn}>
-                <IconSymbol name="doc.on.doc" size={18} color={theme.colors.onGlass} weight="semibold" fallbackGlyph="⧉" />
-              </View>
-            </GlassSurface>
-          </Pressable>
+      {/* Pinned edge-to-edge action bar — top corners rounded via overflow wrap. */}
+      <View
+        style={[styles.actionBarWrap, { borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl }]}
+        onLayout={onActionBarLayout}
+      >
+        <GlassSurface variant="bar" radius="xl" padding="none" sheen={false} floating style={styles.actionBarFill}>
+          <View
+            style={[
+              styles.actionBar,
+              { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: Math.max(insets.bottom, theme.spacing.sm) },
+            ]}
+          >
+            <Button
+              title="Open in Maps"
+              icon="map.fill"
+              iconFallback="🗺"
+              onPress={onOpenMaps}
+              style={{ flex: 1 }}
+            />
+            <SquareGlassButton label="Share day" icon="square.and.arrow.up" glyph="􀈂" onPress={onShare} theme={theme} />
+            <SquareGlassButton label="Copy day link" icon="doc.on.doc" glyph="⧉" onPress={onCopyLink} theme={theme} />
+          </View>
         </GlassSurface>
       </View>
 
@@ -289,7 +353,7 @@ export default function PlanScreen() {
         style={[
           styles.toast,
           {
-            bottom: insets.bottom + 88,
+            bottom: actionBarHeight + theme.spacing.md,
             opacity: toast,
             transform: [{ translateY: toast.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
           },
@@ -305,6 +369,30 @@ export default function PlanScreen() {
         </GlassSurface>
       </Animated.View>
     </View>
+  );
+}
+
+function SquareGlassButton({
+  label,
+  icon,
+  glyph,
+  onPress,
+  theme,
+}: {
+  label: string;
+  icon: Parameters<typeof IconSymbol>[0]['name'];
+  glyph: string;
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
+      <GlassSurface variant="chip" interactive radius="lg" padding="none" sheen={false}>
+        <View style={styles.squareBtn}>
+          <IconSymbol name={icon} size={18} color={theme.colors.onGlass} weight="semibold" fallbackGlyph={glyph} />
+        </View>
+      </GlassSurface>
+    </Pressable>
   );
 }
 
@@ -341,9 +429,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   stripWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+    marginTop: -34,
     paddingHorizontal: 12,
     zIndex: 5,
   },
@@ -351,10 +437,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 12,
+    alignItems: 'flex-start',
   },
   summaryLabel: {
     textTransform: 'uppercase',
@@ -364,10 +447,14 @@ const styles = StyleSheet.create({
   summaryChips: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
     gap: 8,
-    flexShrink: 1,
+    paddingRight: 4,
+  },
+  reorderHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
   },
   dayWarn: {
     flexDirection: 'row',
@@ -392,16 +479,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: 8,
+    overflow: 'hidden',
+  },
+  actionBarFill: {
+    borderRadius: 0,
   },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  copyBtn: {
-    width: 46,
-    height: 46,
+  squareBtn: {
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },

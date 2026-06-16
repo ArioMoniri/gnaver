@@ -5,6 +5,7 @@ export * from './ui';
 export { PlaceSelectRow, type PlaceSelectRowProps } from './PlaceSelectRow';
 export { TimelineStop, type TimelineStopProps } from './TimelineStop';
 export { DayTabStrip, type DayTabStripProps } from './DayTabStrip';
+export { DayOptionsSheet, type DayOptionsSheetProps } from './DayOptionsSheet';
 export { TripMap, type TripMapProps, type TripMapStop } from './TripMap';
 export {
   categoryMeta,

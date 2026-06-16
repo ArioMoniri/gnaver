@@ -42,6 +42,7 @@ export interface ScreenProps {
 }
 
 const NAV_BTN = 38;
+const NAV_HEIGHT = 52;
 
 function NavButton({
   icon,
@@ -88,50 +89,61 @@ export function Screen({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const showNav = !!(title || onBack || rightAction);
+  // Reserve space under the glass header so content doesn't slide beneath it.
+  const navReserve = showNav ? insets.top + NAV_HEIGHT : insets.top;
 
   return (
-    <View
-      style={[styles.root, { backgroundColor: background ?? theme.colors.background, paddingTop: insets.top }, style]}
-    >
+    <View style={[styles.root, { backgroundColor: background ?? theme.colors.background }, style]}>
+      <View style={[styles.body, { paddingTop: navReserve, paddingBottom: edgeToEdgeBottom ? 0 : insets.bottom }]}>
+        {children}
+      </View>
+
+      {/* Liquid Glass header — extends to top:0, blurring behind the status bar. */}
       {showNav ? (
-        <View style={[styles.nav, { paddingHorizontal: theme.spacing.md }]}>
-          <View style={styles.navSide}>
-            {onBack ? (
-              <NavButton
-                icon={backVariant === 'close' ? 'xmark' : 'chevron.left'}
-                onPress={onBack}
-                accessibilityLabel={backVariant === 'close' ? 'Close' : 'Back'}
-              />
-            ) : null}
-          </View>
+        <GlassSurface
+          variant="bar"
+          radius="sm"
+          padding="none"
+          sheen={false}
+          style={styles.navGlass}
+        >
+          <View style={[styles.nav, { marginTop: insets.top, paddingHorizontal: theme.spacing.md }]}>
+            <View style={styles.navSide}>
+              {onBack ? (
+                <NavButton
+                  icon={backVariant === 'close' ? 'xmark' : 'chevron.left'}
+                  onPress={onBack}
+                  accessibilityLabel={backVariant === 'close' ? 'Close' : 'Back'}
+                />
+              ) : null}
+            </View>
 
-          <View style={styles.navCenter}>
-            {title ? (
-              <Text variant="headline" align="center" numberOfLines={1}>
-                {title}
-              </Text>
-            ) : null}
-            {subtitle ? (
-              <Text variant="caption" tone="secondary" align="center" numberOfLines={1}>
-                {subtitle}
-              </Text>
-            ) : null}
-          </View>
+            <View style={styles.navCenter}>
+              {title ? (
+                <Text variant="headline" align="center" numberOfLines={1}>
+                  {title}
+                </Text>
+              ) : null}
+              {subtitle ? (
+                <Text variant="caption" tone="secondary" align="center" numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
 
-          <View style={[styles.navSide, styles.navSideEnd]}>
-            {rightAction ? (
-              <NavButton
-                icon={rightAction.icon}
-                iconFallback={rightAction.iconFallback}
-                onPress={rightAction.onPress}
-                accessibilityLabel={rightAction.accessibilityLabel}
-              />
-            ) : null}
+            <View style={[styles.navSide, styles.navSideEnd]}>
+              {rightAction ? (
+                <NavButton
+                  icon={rightAction.icon}
+                  iconFallback={rightAction.iconFallback}
+                  onPress={rightAction.onPress}
+                  accessibilityLabel={rightAction.accessibilityLabel}
+                />
+              ) : null}
+            </View>
           </View>
-        </View>
+        </GlassSurface>
       ) : null}
-
-      <View style={[styles.body, { paddingBottom: edgeToEdgeBottom ? 0 : insets.bottom }]}>{children}</View>
     </View>
   );
 }
@@ -140,8 +152,15 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  navGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 0,
+  },
   nav: {
-    height: 52,
+    height: NAV_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
   },

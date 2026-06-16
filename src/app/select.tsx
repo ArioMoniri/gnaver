@@ -3,7 +3,17 @@
  * a custom stop, then commit to the optimiser. Handles empty / loading / error.
  */
 import { useCallback, useMemo, useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, TextInput, UIManager, View } from 'react-native';
+import {
+  LayoutAnimation,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  UIManager,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +22,7 @@ import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
 import {
   Button,
+  DayOptionsSheet,
   EmptyState,
   GlassSurface,
   IconSymbol,
@@ -39,8 +50,10 @@ export default function SelectScreen() {
   const center = useTrip((s) => s.center);
   const status = useTrip((s) => s.status);
   const error = useTrip((s) => s.error);
+  const dayCount = useTrip((s) => s.dayCount);
   const toggleSelect = useTrip((s) => s.toggleSelect);
   const setAllSelected = useTrip((s) => s.setAllSelected);
+  const setMustSee = useTrip((s) => s.setMustSee);
   const addCustomPlace = useTrip((s) => s.addCustomPlace);
   const removeCandidate = useTrip((s) => s.removeCandidate);
   const generate = useTrip((s) => s.generate);
@@ -53,6 +66,12 @@ export default function SelectScreen() {
 
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [showDayOptions, setShowDayOptions] = useState(false);
+  const [barHeight, setBarHeight] = useState(96);
+
+  const onBarLayout = useCallback((e: LayoutChangeEvent) => {
+    setBarHeight(e.nativeEvent.layout.height);
+  }, []);
 
   const generating = status === 'generating';
 
@@ -126,11 +145,43 @@ export default function SelectScreen() {
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.lg,
             paddingTop: theme.spacing.sm,
-            paddingBottom: insets.bottom + 120,
+            paddingBottom: barHeight + theme.spacing.md,
             gap: theme.spacing.sm,
           }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Day options entry */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit day start and end points"
+            onPress={() => {
+              hapticSelection();
+              setShowDayOptions(true);
+            }}
+            style={({ pressed }) => [
+              styles.dayOptRow,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.lg },
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <View style={[styles.dayOptIcon, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+              <IconSymbol name="point.topleft.down.curvedto.point.bottomright.up.fill" size={18} color={theme.colors.accent} fallbackGlyph="🧭" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="subhead" weight="600">
+                Day options
+              </Text>
+              <Text variant="caption" tone="secondary" numberOfLines={1}>
+                Start &amp; end for {dayCount} {dayCount === 1 ? 'day' : 'days'} — hotel, your location, or city center
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={theme.colors.textTertiary} fallbackGlyph="›" />
+          </Pressable>
+
+          <Text variant="footnote" tone="tertiary" style={{ marginTop: theme.spacing.xs }}>
+            Tap ☆ to mark a must-see — we&apos;ll prioritise it.
+          </Text>
+
           {candidates.map((place) => (
             <PlaceSelectRow
               key={place.id}
@@ -138,6 +189,7 @@ export default function SelectScreen() {
               selected={!!selectedIds[place.id]}
               currency={currency}
               onToggle={toggleSelect}
+              onToggleMustSee={setMustSee}
               onRemove={place.id.startsWith('custom-') ? removeCandidate : undefined}
             />
           ))}
@@ -195,30 +247,42 @@ export default function SelectScreen() {
         </ScrollView>
       )}
 
-      {/* Sticky optimise bar */}
+      {/* Pinned edge-to-edge optimise bar. The overflow wrapper rounds only the
+          top corners; the glass fills full-width to the screen edges. */}
       {candidates.length > 0 ? (
-        <View style={[styles.bar, { paddingBottom: insets.bottom + theme.spacing.sm, paddingHorizontal: theme.spacing.lg }]}>
-          <GlassSurface variant="bar" radius="xxl" padding="sm" floating style={styles.barCard}>
-            <View style={{ flex: 1 }}>
-              <Text variant="footnote" tone="onGlassSecondary">
-                {selectedCount} {selectedCount === 1 ? 'place' : 'places'}
-              </Text>
-              <Text variant="subhead" weight="600" tone="onGlass">
-                Ready to optimise
-              </Text>
+        <View
+          style={[styles.barWrap, { borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl }]}
+          onLayout={onBarLayout}
+        >
+          <GlassSurface variant="bar" radius="xl" padding="none" sheen={false} floating style={styles.barFill}>
+            <View
+              style={[
+                styles.barInner,
+                { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: Math.max(insets.bottom, theme.spacing.sm) },
+              ]}
+            >
+              <View style={styles.barRow}>
+                <Text variant="footnote" tone="onGlassSecondary" style={{ flexShrink: 1 }} numberOfLines={1}>
+                  {selectedCount} {selectedCount === 1 ? 'place' : 'places'} selected
+                </Text>
+              </View>
+              <Button
+                title="Optimize my trip"
+                icon="arrow.right"
+                iconFallback="→"
+                trailingIcon
+                fullWidth
+                size="lg"
+                disabled={selectedCount === 0 || generating}
+                loading={generating}
+                onPress={onOptimize}
+              />
             </View>
-            <Button
-              title="Optimize my trip"
-              icon="arrow.right"
-              iconFallback="→"
-              trailingIcon
-              disabled={selectedCount === 0 || generating}
-              loading={generating}
-              onPress={onOptimize}
-            />
           </GlassSurface>
         </View>
       ) : null}
+
+      <DayOptionsSheet visible={showDayOptions} onClose={() => setShowDayOptions(false)} />
 
       <LoadingOverlay visible={generating} />
     </Screen>
@@ -254,16 +318,34 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
   },
-  bar: {
+  barWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: 8,
+    overflow: 'hidden',
   },
-  barCard: {
+  barFill: {
+    borderRadius: 0,
+  },
+  barInner: {
+    gap: 10,
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dayOptRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  dayOptIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

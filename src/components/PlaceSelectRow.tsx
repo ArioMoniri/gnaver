@@ -8,7 +8,7 @@ import { Image } from 'expo-image';
 
 import { formatDuration, formatEntry, type CurrencyCode, type Place } from '@/core';
 import { useTheme } from '@/theme';
-import { Text, IconSymbol, RatingStars, hapticSelection } from '@/components/ui';
+import { Text, IconSymbol, RatingStars, hapticSelection, hapticImpact, ImpactFeedbackStyle } from '@/components/ui';
 import { categoryMeta } from './placeMeta';
 
 export interface PlaceSelectRowProps {
@@ -18,9 +18,11 @@ export interface PlaceSelectRowProps {
   onToggle: (id: string) => void;
   /** Optional remove control (e.g. for custom places). */
   onRemove?: (id: string) => void;
+  /** Flag a place as must-see — the optimiser triples its priority. */
+  onToggleMustSee?: (id: string, value: boolean) => void;
 }
 
-export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove }: PlaceSelectRowProps) {
+export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove, onToggleMustSee }: PlaceSelectRowProps) {
   const theme = useTheme();
   const meta = categoryMeta(place.category);
   const isFood = place.isFood || ['restaurant', 'cafe', 'bar', 'street-food'].includes(place.category);
@@ -30,6 +32,12 @@ export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove }
     hapticSelection();
     onToggle(place.id);
   }, [onToggle, place.id]);
+
+  const mustSee = !!place.mustSee;
+  const toggleMustSee = useCallback(() => {
+    hapticImpact(ImpactFeedbackStyle.Light);
+    onToggleMustSee?.(place.id, !mustSee);
+  }, [mustSee, onToggleMustSee, place.id]);
 
   const priceLabel = formatEntry(place.price, currency);
 
@@ -64,8 +72,13 @@ export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove }
           <Text variant="headline" numberOfLines={1} style={styles.name}>
             {place.name}
           </Text>
-          {place.mustSee ? (
-            <IconSymbol name="heart.fill" size={13} color={theme.colors.danger} fallbackGlyph="♥" />
+          {mustSee ? (
+            <View style={[styles.mustBadge, { backgroundColor: `${theme.colors.warning}22`, borderRadius: theme.radius.sm }]}>
+              <IconSymbol name="star.fill" size={10} color={theme.colors.warning} fallbackGlyph="★" />
+              <Text variant="caption" weight="700" style={{ color: theme.colors.warning }}>
+                Must-see
+              </Text>
+            </View>
           ) : null}
         </View>
 
@@ -83,6 +96,23 @@ export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove }
       </View>
 
       <View style={styles.trailing}>
+        {onToggleMustSee ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: mustSee }}
+            accessibilityLabel={mustSee ? `Unmark ${place.name} as must-see` : `Mark ${place.name} as must-see`}
+            hitSlop={10}
+            onPress={toggleMustSee}
+            style={styles.starBtn}
+          >
+            <IconSymbol
+              name={mustSee ? 'star.fill' : 'star'}
+              size={20}
+              color={mustSee ? theme.colors.warning : theme.colors.textTertiary}
+              fallbackGlyph={mustSee ? '★' : '☆'}
+            />
+          </Pressable>
+        ) : null}
         {onRemove ? (
           <Pressable
             accessibilityRole="button"
@@ -142,6 +172,13 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
   },
+  mustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,6 +193,12 @@ const styles = StyleSheet.create({
   removeBtn: {
     width: 22,
     height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
