@@ -1,11 +1,17 @@
 /**
- * Runtime service configuration. Reads API keys from EXPO_PUBLIC_* environment
- * variables (inlined by Expo at build time). When a key is absent, the matching
- * provider falls back to its realistic mock implementation, so the app always
- * runs — keys just upgrade it from sample data to live data.
+ * Runtime service configuration. Keys are resolved dynamically, in priority:
+ *   1. runtime "bring-your-own-key" store (set in Settings, on-device only)
+ *   2. EXPO_PUBLIC_* environment variables (build-time)
+ * When none is present the matching provider falls back to its realistic mock,
+ * so the app always runs — keys just upgrade it from sample to live data.
  *
- * NEVER hardcode keys here. Put them in .env (git-ignored). See .env.example.
+ * `serviceConfig`/`features` use getters so providers (which read them per call)
+ * pick up a freshly-entered key immediately, no restart needed.
+ *
+ * NEVER hardcode real keys here.
  */
+
+import { runtimeKeys } from './runtimeKeys';
 
 const env = process.env;
 
@@ -18,22 +24,44 @@ export interface ServiceConfig {
 }
 
 export const serviceConfig: ServiceConfig = {
-  googleApiKey: env.EXPO_PUBLIC_GOOGLE_API_KEY || undefined,
-  weatherApiKey: env.EXPO_PUBLIC_WEATHER_API_KEY || undefined,
-  llmProvider: (env.EXPO_PUBLIC_LLM_PROVIDER as 'anthropic' | 'openai') || 'anthropic',
-  llmApiKey: env.EXPO_PUBLIC_LLM_API_KEY || undefined,
-  llmModel: env.EXPO_PUBLIC_LLM_MODEL || 'claude-haiku-4-5-20251001',
+  get googleApiKey() {
+    return runtimeKeys.get('googleApiKey') || env.EXPO_PUBLIC_GOOGLE_API_KEY || undefined;
+  },
+  get weatherApiKey() {
+    return runtimeKeys.get('weatherApiKey') || env.EXPO_PUBLIC_WEATHER_API_KEY || undefined;
+  },
+  get llmProvider() {
+    return (
+      (runtimeKeys.get('llmProvider') as 'anthropic' | 'openai' | undefined) ||
+      (env.EXPO_PUBLIC_LLM_PROVIDER as 'anthropic' | 'openai' | undefined) ||
+      'anthropic'
+    );
+  },
+  get llmApiKey() {
+    return runtimeKeys.get('llmApiKey') || env.EXPO_PUBLIC_LLM_API_KEY || undefined;
+  },
+  get llmModel() {
+    return (
+      runtimeKeys.get('llmModel') || env.EXPO_PUBLIC_LLM_MODEL || 'claude-haiku-4-5-20251001'
+    );
+  },
 };
 
-/** Feature availability derived from which keys are present. */
+/** Feature availability derived from which keys are present (live, per-call). */
 export const features = {
   /** Live Google Places / Directions / Geocoding. */
-  livePlaces: !!serviceConfig.googleApiKey,
+  get livePlaces() {
+    return !!serviceConfig.googleApiKey;
+  },
   /** Live weather (Open-Meteo is free and used even without a key). */
-  liveWeather: true,
+  get liveWeather() {
+    return true;
+  },
   /** Conversational taste recommender via an LLM. */
-  liveTaste: !!serviceConfig.llmApiKey,
-} as const;
+  get liveTaste() {
+    return !!serviceConfig.llmApiKey;
+  },
+};
 
 export function describeProviders(): string {
   return [

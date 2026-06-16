@@ -1,12 +1,19 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider, useTheme } from '@/theme';
+import { runtimeKeys } from '@/services';
 
 function ThemedStack() {
   const theme = useTheme();
+
+  useEffect(() => {
+    void runtimeKeys.load();
+  }, []);
+
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
@@ -21,6 +28,7 @@ function ThemedStack() {
         <Stack.Screen name="select" />
         <Stack.Screen name="plan" />
         <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="paywall" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );

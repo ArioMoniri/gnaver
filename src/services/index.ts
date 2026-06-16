@@ -9,3 +9,4 @@ export { tasteProvider } from './llm';
 export { generateItinerary } from './planner';
 export type { GenerateOptions } from './planner';
 export { serviceConfig, features, describeProviders } from './config';
+export { runtimeKeys, type RuntimeKeyName } from './runtimeKeys';

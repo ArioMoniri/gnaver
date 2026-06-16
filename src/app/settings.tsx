@@ -2,12 +2,13 @@
  * Settings — a modal of persisted defaults. Everything here pre-fills the New
  * Trip screen and is stored via the settings store (AsyncStorage-backed).
  */
-import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { describeProviders, features } from '@/services';
+import { describeProviders, features, runtimeKeys } from '@/services';
+import type { RuntimeKeyName } from '@/services';
 import { formatMinutes, type FoodBudget, type Pace, type TransportMode } from '@/core';
 import { useTheme } from '@/theme';
 import { useSettings } from '@/store/settingsStore';
@@ -22,10 +23,18 @@ import {
   Stepper,
   Tag,
   Text,
+  hapticImpact,
+  hapticSelection,
+  ImpactFeedbackStyle,
   interestMeta,
 } from '@/components';
 
 const HOUR_STEP = 30;
+
+const LLM_PROVIDER_OPTIONS: { value: 'anthropic' | 'openai'; label: string }[] = [
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+];
 
 const TRANSPORT_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: 'walk', label: 'Walk' },
@@ -56,10 +65,32 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const s = useSettings();
 
+  // Local state for API keys — seeded from runtimeKeys.all() and kept in sync.
+  const [keyState, setKeyState] = useState<Partial<Record<RuntimeKeyName, string>>>(() => runtimeKeys.all());
+  // Incrementing counter forces a re-read of describeProviders() / features after edits.
+  const [keyVersion, setKeyVersion] = useState(0);
+
+  const setKey = useCallback((name: RuntimeKeyName, value: string) => {
+    runtimeKeys.set(name, value);
+    setKeyState(runtimeKeys.all());
+    setKeyVersion((v) => v + 1);
+  }, []);
+
+  const clearKeys = useCallback(() => {
+    hapticImpact(ImpactFeedbackStyle.Medium);
+    runtimeKeys.clear();
+    setKeyState({});
+    setKeyVersion((v) => v + 1);
+  }, []);
+
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }, [router]);
+
+  // Re-read live provider status on each render after key edits.
+  const providerDesc = describeProviders();
+  void keyVersion; // referenced so lint doesn't strip it
 
   return (
     <Screen title="Settings" onBack={close} backVariant="close" edgeToEdgeBottom>
@@ -72,6 +103,92 @@ export default function SettingsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Gnaver Pro upgrade row */}
+        <ProBannerRow onPress={() => router.push('/paywall')} theme={theme} />
+
+        {/* API Keys */}
+        <Section title="Your API keys" subtitle="Bring your own keys — free forever" theme={theme}>
+          {/* Helper copy */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="footnote" tone="secondary">
+              Keys stay on this device, never uploaded. Without keys, Gnaver uses realistic sample data.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.sm }}>
+              <Pressable onPress={() => void Linking.openURL('https://console.cloud.google.com')}>
+                <Text variant="footnote" tone="accent">Get Google key ↗</Text>
+              </Pressable>
+              <Pressable onPress={() => void Linking.openURL('https://console.anthropic.com')}>
+                <Text variant="footnote" tone="accent">Get Anthropic key ↗</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Live/mock badge summary */}
+          <View style={[styles.featureRow, { marginBottom: theme.spacing.lg }]}>
+            <IconSymbol
+              name={features.livePlaces ? 'dot.radiowaves.left.and.right' : 'circle.dashed'}
+              size={14}
+              color={features.livePlaces ? theme.colors.success : theme.colors.textTertiary}
+              fallbackGlyph={features.livePlaces ? '📡' : '○'}
+            />
+            <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>{providerDesc}</Text>
+          </View>
+
+          <KeyField
+            label="Google Maps Platform"
+            placeholder="AIza…"
+            value={keyState.googleApiKey ?? ''}
+            live={features.livePlaces}
+            liveLabel="Live"
+            onChangeText={(v) => setKey('googleApiKey', v)}
+            theme={theme}
+          />
+
+          <Field label="LLM provider" theme={theme}>
+            <Segmented<'anthropic' | 'openai'>
+              options={LLM_PROVIDER_OPTIONS}
+              value={(keyState.llmProvider as 'anthropic' | 'openai') ?? 'anthropic'}
+              onChange={(v) => { hapticSelection(); setKey('llmProvider', v); }}
+            />
+          </Field>
+
+          <KeyField
+            label="LLM API key"
+            placeholder={keyState.llmProvider === 'openai' ? 'sk-…' : 'sk-ant-…'}
+            value={keyState.llmApiKey ?? ''}
+            live={features.liveTaste}
+            liveLabel="Live"
+            onChangeText={(v) => setKey('llmApiKey', v)}
+            theme={theme}
+          />
+
+          <Field label="Model (optional)" theme={theme}>
+            <TextInput
+              defaultValue={keyState.llmModel ?? ''}
+              placeholder="claude-haiku-4-5-20251001"
+              placeholderTextColor={theme.colors.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              onEndEditing={(e) => setKey('llmModel', e.nativeEvent.text)}
+              style={[
+                styles.input,
+                { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.md, color: theme.colors.text },
+              ]}
+            />
+          </Field>
+
+          <Button
+            title="Clear keys"
+            variant="danger"
+            size="sm"
+            icon="trash"
+            iconFallback="🗑"
+            haptic="impact"
+            onPress={clearKeys}
+            style={{ alignSelf: 'flex-start', marginTop: theme.spacing.xs }}
+          />
+        </Section>
+
         {/* Defaults */}
         <Section title="Defaults" subtitle="Pre-fill every new trip" theme={theme}>
           <Field label="Interests" theme={theme}>
@@ -241,6 +358,88 @@ export default function SettingsScreen() {
   );
 }
 
+/** Subtle Pro upgrade banner at the top of Settings. */
+function ProBannerRow({
+  onPress,
+  theme,
+}: {
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Upgrade to Gnaver Pro"
+      onPress={() => { hapticSelection(); onPress(); }}
+    >
+      <GlassCard padding="md" radius="xl">
+        <View style={styles.proBannerRow}>
+          <View style={[styles.proIconWrap, { backgroundColor: theme.colors.accentSoft }]}>
+            <IconSymbol name="sparkles" size={20} color={theme.colors.accent} fallbackGlyph="✨" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="headline" weight="700">Gnaver Pro</Text>
+            <Text variant="footnote" tone="secondary">No key setup · hosted AI · unlimited cities</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Tag label="Soon" tone="accent" />
+            <IconSymbol name="chevron.right" size={14} color={theme.colors.textTertiary} fallbackGlyph="›" />
+          </View>
+        </View>
+      </GlassCard>
+    </Pressable>
+  );
+}
+
+/** Key field with a live/mock badge. */
+function KeyField({
+  label,
+  placeholder,
+  value,
+  live,
+  liveLabel,
+  onChangeText,
+  theme,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  live: boolean;
+  liveLabel: string;
+  onChangeText: (v: string) => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <View style={{ marginBottom: theme.spacing.lg }}>
+      <View style={[styles.keyLabelRow, { marginBottom: theme.spacing.sm }]}>
+        <Text
+          variant="caption"
+          tone="tertiary"
+          weight="600"
+          style={{ textTransform: 'uppercase', letterSpacing: 0.6 }}
+        >
+          {label}
+        </Text>
+        <Tag label={live ? liveLabel : 'Sample data'} tone={live ? 'success' : 'neutral'} />
+      </View>
+      <TextInput
+        value={value}
+        placeholder={placeholder}
+        placeholderTextColor={theme.colors.textTertiary}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="while-editing"
+        onChangeText={onChangeText}
+        style={[
+          styles.input,
+          { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.md, color: theme.colors.text },
+        ]}
+      />
+    </View>
+  );
+}
+
 function Section({
   title,
   subtitle,
@@ -380,9 +579,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   aboutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  proBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  proIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
