@@ -33,6 +33,7 @@ import {
   type CitySuggestion,
 } from '@/core';
 import { listCities } from '@/data';
+import { flagFor } from '@/components/cityFlags';
 import { placesProvider } from '@/services';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
@@ -554,6 +555,7 @@ export default function NewTripScreen() {
                     <Chip
                       key={city.id}
                       label={city.name}
+                      image={flagFor(city.id)}
                       emoji={city.emoji}
                       size="sm"
                       selected={active}

@@ -7,10 +7,12 @@
 import { useCallback, useRef } from 'react';
 import {
   Animated,
+  Image,
   Pressable,
   StyleSheet,
   View,
   type ColorValue,
+  type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -30,6 +32,8 @@ export interface ChipProps {
   icon?: SFSymbol;
   /** Leading emoji (cheap cross-platform glyph). */
   emoji?: string;
+  /** Leading image (e.g. a flag) — preferred over emoji for consistent rendering. */
+  image?: ImageSourcePropType;
   disabled?: boolean;
   size?: 'sm' | 'md';
   /** Render the unselected state as Liquid Glass (for chips floating over the map). */
@@ -43,6 +47,7 @@ export function Chip({
   onPress,
   icon,
   emoji,
+  image,
   disabled = false,
   size = 'md',
   overMap = false,
@@ -77,7 +82,13 @@ export function Chip({
 
   const inner = (
     <View style={[styles.row, { paddingVertical: paddingV, paddingHorizontal: paddingH }]}>
-      {emoji ? (
+      {image ? (
+        <Image
+          source={image}
+          style={[size === 'sm' ? styles.flagSm : styles.flag, { borderColor: theme.colors.border }]}
+          resizeMode="cover"
+        />
+      ) : emoji ? (
         <Text variant={size === 'sm' ? 'footnote' : 'subhead'}>{emoji}</Text>
       ) : icon ? (
         <IconSymbol name={icon} size={15} color={iconColor} />
@@ -152,5 +163,17 @@ const styles = StyleSheet.create({
     right: 0,
     height: StyleSheet.hairlineWidth * 2,
     opacity: 0.7,
+  },
+  flag: {
+    width: 22,
+    height: 15,
+    borderRadius: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  flagSm: {
+    width: 18,
+    height: 12,
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });
