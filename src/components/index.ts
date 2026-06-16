@@ -2,6 +2,7 @@
  * Travel-domain components barrel.
  */
 export * from './ui';
+export { PulsingLogo } from './ui/LoadingOverlay';
 export { PlaceSelectRow, type PlaceSelectRowProps } from './PlaceSelectRow';
 export { TimelineStop, type TimelineStopProps } from './TimelineStop';
 export { DayTabStrip, type DayTabStripProps } from './DayTabStrip';

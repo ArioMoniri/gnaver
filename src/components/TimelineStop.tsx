@@ -56,6 +56,7 @@ export function TimelineStop({
   const priceLabel = formatEntry(place.price, currency);
   const payments = place.price ? formatPayments(place.price.acceptedPayments) : null;
   const warnings = stop.warnings ?? [];
+  const tips = stop.tips ?? [];
 
   return (
     <View style={styles.row}>
@@ -165,6 +166,23 @@ export function TimelineStop({
             <Text variant="caption" tone="tertiary" style={{ marginTop: 2 }} numberOfLines={2}>
               {place.price.notes}
             </Text>
+          ) : null}
+
+          {/* Friendly advisory tips — soft accent rows, distinct from warnings. */}
+          {tips.length > 0 ? (
+            <View style={styles.tips}>
+              {tips.map((t, i) => (
+                <View
+                  key={i}
+                  style={[styles.tipRow, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.sm }]}
+                >
+                  <IconSymbol name="lightbulb.fill" size={12} color={theme.colors.accent} fallbackGlyph="💡" style={styles.tipIcon} />
+                  <Text variant="caption" tone="accent" style={styles.tipText}>
+                    {t}
+                  </Text>
+                </View>
+              ))}
+            </View>
           ) : null}
 
           {warnings.length > 0 ? (
@@ -349,13 +367,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  tips: {
+    marginTop: 10,
+    gap: 6,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  tipIcon: {
+    marginTop: 1,
+  },
+  tipText: {
+    flex: 1,
+    flexShrink: 1,
+  },
   warnings: {
     marginTop: 10,
     gap: 4,
   },
   warnRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 6,
   },
 });

@@ -159,8 +159,8 @@ export default function SelectScreen() {
                 { backgroundColor: `${theme.colors.warning}1A`, borderColor: `${theme.colors.warning}33`, borderRadius: theme.radius.md },
               ]}
             >
-              <IconSymbol name="info.circle.fill" size={15} color={theme.colors.warning} fallbackGlyph="ⓘ" />
-              <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
+              <IconSymbol name="info.circle.fill" size={15} color={theme.colors.warning} fallbackGlyph="ⓘ" style={styles.sampleIcon} />
+              <Text variant="footnote" tone="secondary" style={{ flex: 1, flexShrink: 1 }}>
                 We couldn&apos;t read that list directly — here&apos;s a sample you can edit.
               </Text>
             </View>
@@ -308,11 +308,14 @@ export default function SelectScreen() {
 const styles = StyleSheet.create({
   sampleBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     padding: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  sampleIcon: {
+    marginTop: 1,
   },
   addRow: {
     flexDirection: 'row',

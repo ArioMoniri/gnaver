@@ -4,15 +4,36 @@
  * trip store from saved settings on mount and pushes to /select when ready.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import {
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+  LayoutChangeEvent,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-import { formatMinutes, type FoodBudget, type Interest, type MealKind, type Pace, type TransportMode } from '@/core';
+import {
+  formatMinutes,
+  formatDateLabel,
+  addDays,
+  type FoodBudget,
+  type Interest,
+  type MealKind,
+  type Pace,
+  type TransportMode,
+  type CitySuggestion,
+} from '@/core';
 import { listCities } from '@/data';
+import { placesProvider } from '@/services';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
 import { useSettings } from '@/store/settingsStore';
@@ -20,6 +41,7 @@ import {
   ALL_INTERESTS,
   Button,
   Chip,
+  DayOptionsSheet,
   GlassCard,
   GlassSurface,
   IconSymbol,
@@ -65,6 +87,12 @@ const MEAL_OPTIONS: { value: MealKind; label: string; emoji: string }[] = [
 
 const HOUR_STEP = 30;
 
+/** Convert a JS Date from DateTimePicker to a local yyyy-mm-dd string without UTC shifting. */
+function jsDateToIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export default function NewTripScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -79,6 +107,23 @@ export default function NewTripScreen() {
   const [cityQuery, setCityQuery] = useState('');
   const [cuisineDraft, setCuisineDraft] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showDayOptions, setShowDayOptions] = useState(false);
+
+  // City autocomplete dropdown state
+  const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const todayDate = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  // CTA bar height measured for ScrollView bottom padding
+  const [ctaHeight, setCtaHeight] = useState(132);
 
   // First-run onboarding triptych (one-row, AsyncStorage flag).
   useEffect(() => {
@@ -134,6 +179,34 @@ export default function NewTripScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.hasHydrated]);
 
+  // Autocomplete: debounce 300 ms, min 2 chars
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = cityQuery.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setLoadingSuggestions(false);
+      return;
+    }
+    setLoadingSuggestions(true);
+    debounceRef.current = setTimeout(() => {
+      placesProvider
+        .autocompleteCities(q)
+        .then((results) => {
+          setSuggestions(results);
+        })
+        .catch(() => {
+          setSuggestions([]);
+        })
+        .finally(() => {
+          setLoadingSuggestions(false);
+        });
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [cityQuery]);
+
   const prefs = trip.preferences;
   const cityChosen = trip.source === 'city' && !!trip.cityId;
   const linkLoaded = trip.source === 'link' && trip.candidates.length > 0;
@@ -176,18 +249,33 @@ export default function NewTripScreen() {
     router.push('/select');
   }, [canContinue, router]);
 
-  const onSearchCity = useCallback(() => {
-    const q = cityQuery.trim();
-    if (!q) return;
-    hapticSelection();
-    void trip.startFromCityQuery(q);
-  }, [cityQuery, trip]);
+  const onPickSuggestion = useCallback(
+    (suggestion: CitySuggestion) => {
+      hapticSelection();
+      setCityQuery(suggestion.label);
+      setSuggestions([]);
+      void trip.startFromCityQuery(suggestion.label);
+    },
+    [trip],
+  );
 
   const onPickCity = useCallback(
     (id: string, name: string) => {
       hapticSelection();
       setCityQuery(name);
+      setSuggestions([]);
       void trip.startFromCity(id);
+    },
+    [trip],
+  );
+
+  const onDateChange = useCallback(
+    (_event: DateTimePickerEvent, date?: Date) => {
+      setShowDatePicker(false);
+      if (date) {
+        hapticSelection();
+        trip.setStartDate(jsDateToIso(date));
+      }
     },
     [trip],
   );
@@ -227,11 +315,27 @@ export default function NewTripScreen() {
   const toggleQuickBites = useCallback(
     (v: boolean) => {
       hapticSelection();
-      // "Quick bites" caps walking time so the optimiser favours nearby, fast food.
       trip.setPreferences({ maxWalkMinutes: v ? 12 : undefined });
     },
     [trip],
   );
+
+  const onCtaLayout = useCallback((e: LayoutChangeEvent) => {
+    setCtaHeight(e.nativeEvent.layout.height);
+  }, []);
+
+  // Date range label: "Tue, Jun 16 → Thu, Jun 18"
+  const dateRangeLabel = useMemo(() => {
+    const start = formatDateLabel(trip.startDate);
+    const end = formatDateLabel(addDays(trip.startDate, trip.dayCount - 1));
+    return `${start} → ${end}`;
+  }, [trip.startDate, trip.dayCount]);
+
+  // JS Date object for the picker, constructed without UTC shifting
+  const pickerDate = useMemo(() => {
+    const [y, m, d] = trip.startDate.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }, [trip.startDate]);
 
   return (
     <View style={styles.root}>
@@ -252,7 +356,7 @@ export default function NewTripScreen() {
         contentContainerStyle={{
           paddingTop: insets.top + theme.spacing.md,
           paddingHorizontal: theme.spacing.xl,
-          paddingBottom: insets.bottom + 132,
+          paddingBottom: insets.bottom + ctaHeight + theme.spacing.lg,
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -348,24 +452,76 @@ export default function NewTripScreen() {
                 <IconSymbol name="magnifyingglass" size={16} color={theme.colors.textTertiary} fallbackGlyph="⌕" />
                 <TextInput
                   value={cityQuery}
-                  onChangeText={setCityQuery}
-                  onSubmitEditing={onSearchCity}
+                  onChangeText={(t) => {
+                    setCityQuery(t);
+                    // Clear chosen city if user edits
+                  }}
                   placeholder="Search any city…"
                   placeholderTextColor={theme.colors.textTertiary}
                   autoCapitalize="words"
                   autoCorrect={false}
                   returnKeyType="search"
+                  onSubmitEditing={() => {
+                    const q = cityQuery.trim();
+                    if (q) {
+                      hapticSelection();
+                      void trip.startFromCityQuery(q);
+                    }
+                  }}
                   style={[styles.input, { color: theme.colors.text }]}
                 />
-                {cityQuery.trim() ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel="Search city" hitSlop={8} onPress={onSearchCity}>
-                    <Text variant="footnote" weight="600" tone="accent">
-                      Search
-                    </Text>
+                {loadingSuggestions ? (
+                  <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                    <IconSymbol name="arrow.triangle.2.circlepath" size={15} color={theme.colors.accent} fallbackGlyph="↻" />
+                  </Animated.View>
+                ) : cityQuery.trim() ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear city search"
+                    hitSlop={8}
+                    onPress={() => {
+                      setCityQuery('');
+                      setSuggestions([]);
+                    }}
+                  >
+                    <IconSymbol name="xmark.circle.fill" size={16} color={theme.colors.textTertiary} fallbackGlyph="✕" />
                   </Pressable>
                 ) : null}
               </View>
 
+              {/* Autocomplete dropdown */}
+              {suggestions.length > 0 ? (
+                <View
+                  style={[
+                    styles.dropdown,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+                  ]}
+                >
+                  {suggestions.map((s, idx) => (
+                    <Pressable
+                      key={s.id ?? s.label}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select ${s.label}`}
+                      onPress={() => onPickSuggestion(s)}
+                      style={[
+                        styles.dropdownRow,
+                        idx < suggestions.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
+                      ]}
+                    >
+                      <IconSymbol name="mappin" size={13} color={theme.colors.accent} fallbackGlyph="📍" />
+                      <Text variant="footnote" tone="onGlass" numberOfLines={1} style={{ flex: 1 }}>
+                        {s.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : cityQuery.trim().length >= 2 && !loadingSuggestions && suggestions.length === 0 && !cityChosen ? (
+                <Text variant="caption" tone="onGlassSecondary" style={{ marginTop: theme.spacing.sm }}>
+                  No cities found — try a different spelling.
+                </Text>
+              ) : null}
+
+              {/* Status row (loading / error / success) */}
               {loadingLink ? (
                 <View style={[styles.loadedRow, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
                   <Animated.View style={{ transform: [{ rotate: spin }] }}>
@@ -521,6 +677,42 @@ export default function NewTripScreen() {
               />
             </View>
 
+            {/* Start date picker */}
+            <View style={styles.field}>
+              <SectionLabel theme={theme}>Start date</SectionLabel>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Pick start date"
+                onPress={() => {
+                  hapticSelection();
+                  setShowDatePicker(true);
+                }}
+                style={[
+                  styles.datePressable,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.radius.md,
+                  },
+                ]}
+              >
+                <IconSymbol name="calendar" size={16} color={theme.colors.accent} fallbackGlyph="📅" />
+                <Text variant="subhead" weight="600" tone="onGlass" style={{ flex: 1 }}>
+                  {dateRangeLabel}
+                </Text>
+                <IconSymbol name="chevron.right" size={13} color={theme.colors.textTertiary} fallbackGlyph="›" />
+              </Pressable>
+              {showDatePicker && (
+                <DateTimePicker
+                  mode="date"
+                  value={pickerDate}
+                  minimumDate={todayDate}
+                  onChange={onDateChange}
+                  display="spinner"
+                />
+              )}
+            </View>
+
             <View style={styles.field}>
               <Stepper label="Days" value={trip.dayCount} min={1} max={14} onChange={(n) => trip.setDayCount(n)} />
             </View>
@@ -546,6 +738,42 @@ export default function NewTripScreen() {
                 format={formatMinutes}
                 onChange={(m) => trip.setHours(trip.startMinutes, m)}
               />
+            </View>
+
+            {/* Prominent Day Options card */}
+            <View style={styles.field}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set daily start and end locations"
+                onPress={() => {
+                  hapticImpact(ImpactFeedbackStyle.Light);
+                  setShowDayOptions(true);
+                }}
+              >
+                <View
+                  style={[
+                    styles.dayOptionsCard,
+                    {
+                      backgroundColor: theme.colors.accentSoft,
+                      borderColor: theme.colors.accent,
+                      borderRadius: theme.radius.md,
+                    },
+                  ]}
+                >
+                  <View style={styles.dayOptionsIcon}>
+                    <IconSymbol name="bed.double.fill" size={18} color={theme.colors.accent} fallbackGlyph="🏨" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="subhead" weight="700" tone="accent">
+                      Set daily start &amp; end (hotel)
+                    </Text>
+                    <Text variant="caption" tone="onGlassSecondary" style={{ marginTop: 2 }}>
+                      Choose where each day begins and ends — your hotel, Airbnb, or any address.
+                    </Text>
+                  </View>
+                  <IconSymbol name="chevron.right" size={14} color={theme.colors.accent} fallbackGlyph="›" />
+                </View>
+              </Pressable>
             </View>
 
             <View style={[styles.foodToggleRow, styles.field]}>
@@ -670,7 +898,10 @@ export default function NewTripScreen() {
       </ScrollView>
 
       {/* Sticky glass CTA bar */}
-      <View style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.md, paddingHorizontal: theme.spacing.xl }]}>
+      <View
+        style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.md, paddingHorizontal: theme.spacing.xl }]}
+        onLayout={onCtaLayout}
+      >
         <GlassSurface variant="bar" radius="xxl" padding="md" floating style={styles.ctaBar}>
           <Button
             title="Find places"
@@ -684,6 +915,8 @@ export default function NewTripScreen() {
           />
         </GlassSurface>
       </View>
+
+      <DayOptionsSheet visible={showDayOptions} onClose={() => setShowDayOptions(false)} />
     </View>
   );
 }
@@ -793,6 +1026,41 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     paddingVertical: 0,
+  },
+  dropdown: {
+    marginTop: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  dropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  datePressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  dayOptionsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+  },
+  dayOptionsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   linkActions: {
     flexDirection: 'row',

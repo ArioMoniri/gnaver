@@ -1,6 +1,7 @@
 /**
  * Per-day start/end point editor. A bottom sheet (Modal) listing every day of
  * the trip; for each day the traveller sets a START and an END point via one of:
+ *   • Type a hotel/address (geocoded via placesProvider.geocodeAddress)
  *   • Use my current location (expo-location, with permission)
  *   • Pick from my places (any selected candidate)
  *   • City center (the default — clears the override)
@@ -9,11 +10,12 @@
  * Pure presentation over the trip store; data flow is unchanged.
  */
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 
 import { dateRange, formatDateLabel, type LatLng, type Place } from '@/core';
+import { placesProvider } from '@/services';
 import { useTheme } from '@/theme';
 import { useTrip, type DayOverride } from '@/store/tripStore';
 import {
@@ -56,6 +58,58 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
   // Inline "pick from my places" target: which (day, edge) is choosing.
   const [picking, setPicking] = useState<{ index: number; edge: Edge } | null>(null);
   const [locating, setLocating] = useState(false);
+
+  // Address input state: keyed by "i-edge" string
+  const [addressDrafts, setAddressDrafts] = useState<Record<string, string>>({});
+  const [geocoding, setGeocoding] = useState<Record<string, boolean>>({});
+  const [geocodeHints, setGeocodeHints] = useState<Record<string, string>>({});
+
+  const draftKey = (index: number, edge: Edge) => `${index}-${edge}`;
+
+  const setDraft = useCallback((index: number, edge: Edge, text: string) => {
+    setAddressDrafts((prev) => ({ ...prev, [draftKey(index, edge)]: text }));
+    // Clear any prior hint when user types
+    setGeocodeHints((prev) => {
+      const next = { ...prev };
+      delete next[draftKey(index, edge)];
+      return next;
+    });
+  }, []);
+
+  const submitAddress = useCallback(
+    async (index: number, edge: Edge) => {
+      const key = draftKey(index, edge);
+      const text = (addressDrafts[key] ?? '').trim();
+      if (!text) return;
+      setGeocoding((prev) => ({ ...prev, [key]: true }));
+      setGeocodeHints((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      try {
+        const result = await placesProvider.geocodeAddress(text);
+        if (result) {
+          const patch: DayOverride =
+            edge === 'start'
+              ? { startLocation: result.location, startName: result.label }
+              : { endLocation: result.location, endName: result.label };
+          setDayOverride(index, patch);
+          hapticImpact(ImpactFeedbackStyle.Light);
+          // Clear the draft after success
+          setAddressDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; });
+        } else {
+          setGeocodeHints((prev) => ({
+            ...prev,
+            [key]: 'Add a Google key to search addresses',
+          }));
+          hapticNotify(NotificationFeedbackType.Warning);
+        }
+      } catch {
+        setGeocodeHints((prev) => ({ ...prev, [key]: 'Address search failed' }));
+        hapticNotify(NotificationFeedbackType.Error);
+      } finally {
+        setGeocoding((prev) => ({ ...prev, [key]: false }));
+      }
+    },
+    [addressDrafts, setDayOverride],
+  );
 
   const applyCurrentLocation = useCallback(
     async (index: number, edge: Edge) => {
@@ -103,6 +157,17 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
           ? { startLocation: undefined, startName: undefined }
           : { endLocation: undefined, endName: undefined };
       setDayOverride(index, patch);
+      // Clear the address draft for this slot too
+      setAddressDrafts((prev) => {
+        const n = { ...prev };
+        delete n[draftKey(index, edge)];
+        return n;
+      });
+      setGeocodeHints((prev) => {
+        const n = { ...prev };
+        delete n[draftKey(index, edge)];
+        return n;
+      });
       hapticSelection();
     },
     [setDayOverride],
@@ -155,6 +220,7 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
                   </View>
 
                   <EdgeRow
+                    index={i}
                     label="Start"
                     name={o.startName ?? 'City center'}
                     isDefault={!o.startLocation}
@@ -168,11 +234,17 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
                     onSelectPlace={(p) => applyPlace(i, 'start', p)}
                     theme={theme}
                     hasCenter={!!center}
+                    addressDraft={addressDrafts[draftKey(i, 'start')] ?? ''}
+                    onAddressDraftChange={(t) => setDraft(i, 'start', t)}
+                    onAddressSubmit={() => void submitAddress(i, 'start')}
+                    geocoding={geocoding[draftKey(i, 'start')] ?? false}
+                    geocodeHint={geocodeHints[draftKey(i, 'start')]}
                   />
 
                   <View style={[styles.divider, { backgroundColor: theme.colors.glassBorder }]} />
 
                   <EdgeRow
+                    index={i}
                     label="End"
                     name={o.endName ?? (o.startName ?? 'City center')}
                     isDefault={!o.endLocation}
@@ -186,6 +258,11 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
                     onSelectPlace={(p) => applyPlace(i, 'end', p)}
                     theme={theme}
                     hasCenter={!!center}
+                    addressDraft={addressDrafts[draftKey(i, 'end')] ?? ''}
+                    onAddressDraftChange={(t) => setDraft(i, 'end', t)}
+                    onAddressSubmit={() => void submitAddress(i, 'end')}
+                    geocoding={geocoding[draftKey(i, 'end')] ?? false}
+                    geocodeHint={geocodeHints[draftKey(i, 'end')]}
                   />
                 </GlassSurface>
               );
@@ -198,6 +275,7 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
 }
 
 function EdgeRow({
+  index: _index,
   label,
   name,
   isDefault,
@@ -211,7 +289,13 @@ function EdgeRow({
   onSelectPlace,
   theme,
   hasCenter,
+  addressDraft,
+  onAddressDraftChange,
+  onAddressSubmit,
+  geocoding,
+  geocodeHint,
 }: {
+  index: number;
   label: string;
   name: string;
   isDefault: boolean;
@@ -225,6 +309,11 @@ function EdgeRow({
   onSelectPlace: (p: Place) => void;
   theme: ReturnType<typeof useTheme>;
   hasCenter: boolean;
+  addressDraft: string;
+  onAddressDraftChange: (t: string) => void;
+  onAddressSubmit: () => void;
+  geocoding: boolean;
+  geocodeHint?: string;
 }) {
   return (
     <View style={styles.edge}>
@@ -242,6 +331,53 @@ function EdgeRow({
           </Text>
         ) : null}
       </View>
+
+      {/* Address / hotel input */}
+      <View
+        style={[
+          styles.addressRow,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+            borderRadius: theme.radius.sm,
+          },
+        ]}
+      >
+        <IconSymbol name="building.2" size={13} color={theme.colors.textTertiary} fallbackGlyph="🏨" />
+        <TextInput
+          value={addressDraft}
+          onChangeText={onAddressDraftChange}
+          onSubmitEditing={onAddressSubmit}
+          placeholder="Hotel or address…"
+          placeholderTextColor={theme.colors.textTertiary}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="search"
+          style={[styles.addressInput, { color: theme.colors.text }]}
+        />
+        {geocoding ? (
+          <Text variant="caption" tone="accent">
+            …
+          </Text>
+        ) : addressDraft.trim() ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Search ${label.toLowerCase()} address`}
+            hitSlop={8}
+            onPress={onAddressSubmit}
+          >
+            <Text variant="caption" weight="600" tone="accent">
+              Go
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {geocodeHint ? (
+        <Text variant="caption" tone="onGlassSecondary" style={{ marginTop: 4, marginLeft: 4 }}>
+          {geocodeHint}
+        </Text>
+      ) : null}
 
       <View style={styles.edgeActions}>
         <MiniAction icon="location.fill" glyph="📍" label="My location" onPress={onCurrent} disabled={busy} theme={theme} />
@@ -370,6 +506,19 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 10,
+    height: 38,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  addressInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 0,
   },
   edgeActions: {
     flexDirection: 'row',

@@ -55,15 +55,29 @@ export default function PlanScreen() {
   const reorderStops = useTrip((s) => s.reorderStops);
   const reset = useTrip((s) => s.reset);
 
-  const mapHeight = Math.round(Dimensions.get('window').height * MAP_RATIO);
+  // Map height scales with the viewport but is clamped so it never crowds the
+  // sheet on short devices (iPhone SE) or runs away on tall ones (Pro Max).
+  const windowHeight = Dimensions.get('window').height;
+  const mapHeight = Math.round(Math.min(Math.max(windowHeight * MAP_RATIO, 260), 460));
   // Clear the Dynamic Island for any chip floating over the map.
   const chipTop = Math.max(insets.top + 8, 74);
 
-  // Measure the pinned action bar so the sheet/toast clear it exactly.
+  // Measure the pinned action bar so the sheet/toast clear it exactly — no magic
+  // numbers, so the last buttons are never hidden behind the bar at any size.
   const [actionBarHeight, setActionBarHeight] = useState(96);
   const onActionBarLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
     setActionBarHeight(e.nativeEvent.layout.height);
   }, []);
+
+  // Measure the floating day strip so it straddles the map/sheet seam by exactly
+  // half its rendered height — it sits cleanly between the map and the sheet at
+  // any size, never colliding with map labels above or the summary chips below.
+  const [stripHeight, setStripHeight] = useState(0);
+  const onStripLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
+    setStripHeight(e.nativeEvent.layout.height);
+  }, []);
+  // Pull the strip up by half its height so its centre lands on the seam.
+  const stripOverlap = stripHeight > 0 ? Math.round(stripHeight / 2) : theme.spacing.xxl;
 
   const days = itinerary?.days ?? [];
   const safeDay = Math.min(activeDay, Math.max(0, days.length - 1));
@@ -231,13 +245,16 @@ export default function PlanScreen() {
         </View>
       </View>
 
-      {/* Day strip — inline (not absolute), overlapping the map's bottom edge as
-          a glass bar so it never collides with the sheet content below it. */}
-      <View style={styles.stripWrap}>
+      {/* Day strip — inline (not absolute), dipping below the map's bottom edge
+          by a measured, token-based overlap so it sits cleanly on the seam and
+          never collides with map labels above or the sheet content below. */}
+      <View style={[styles.stripWrap, { marginTop: -stripOverlap }]} onLayout={onStripLayout}>
         <DayTabStrip days={days} activeDay={safeDay} onSelect={onSelectDay} />
       </View>
 
-      {/* Sheet */}
+      {/* Sheet — its rounded top tucks just under the strip. The top padding is
+          derived from the measured strip height so the first chips clear it at
+          any screen size (no fixed offsets). */}
       <View
         style={[
           styles.sheet,
@@ -245,14 +262,19 @@ export default function PlanScreen() {
             backgroundColor: theme.colors.background,
             borderTopLeftRadius: theme.radius.xl,
             borderTopRightRadius: theme.radius.xl,
-            marginTop: -8,
+            // Tuck the rounded corner a hair under the strip's lower edge so the
+            // seam reads as one surface — a small token, not a magic offset.
+            marginTop: -theme.spacing.xs,
           },
         ]}
       >
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.lg,
-            paddingTop: theme.spacing.xl,
+            // The sheet's rounded corner tucks `xs` under the strip; clear that
+            // tuck plus a token of breathing room so the first chips never sit
+            // under the strip at any screen size.
+            paddingTop: theme.spacing.xs + theme.spacing.xl,
             paddingBottom: actionBarHeight + theme.spacing.lg,
           }}
           showsVerticalScrollIndicator={false}
@@ -278,6 +300,27 @@ export default function PlanScreen() {
                   {day.weather ? <WeatherPill weather={day.weather} /> : null}
                 </ScrollView>
               </View>
+
+              {/* Soft day-level advisory tips (e.g. "☔ Take an umbrella today").
+                  Stacked above the timeline with margin; hidden when empty. */}
+              {day.tips && day.tips.length > 0 ? (
+                <View style={[styles.dayTips, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+                  <IconSymbol name="lightbulb.fill" size={14} color={theme.colors.accent} fallbackGlyph="💡" style={styles.dayTipIcon} />
+                  <View style={styles.dayTipsText}>
+                    {day.tips.map((tip, i) => (
+                      <Text
+                        key={i}
+                        variant="footnote"
+                        tone="accent"
+                        weight="600"
+                        style={i > 0 ? { marginTop: 2 } : undefined}
+                      >
+                        {tip}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
 
               {day.warnings && day.warnings.length > 0 ? (
                 <View style={[styles.dayWarn, { backgroundColor: `${theme.colors.warning}1A`, borderRadius: theme.radius.md }]}>
@@ -467,7 +510,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   stripWrap: {
-    marginTop: -34,
     paddingHorizontal: 12,
     zIndex: 5,
   },
@@ -500,6 +542,20 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 10,
     marginTop: 14,
+  },
+  dayTips: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    marginTop: 16,
+  },
+  dayTipIcon: {
+    marginTop: 1,
+  },
+  dayTipsText: {
+    flex: 1,
+    flexShrink: 1,
   },
   dishesHead: {
     flexDirection: 'row',
