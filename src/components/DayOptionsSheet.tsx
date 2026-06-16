@@ -54,6 +54,12 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
     () => candidates.filter((p) => selectedIds[p.id]),
     [candidates, selectedIds],
   );
+  // Fall back to all candidates if nothing is selected yet, so the picker/search
+  // is never inertly empty.
+  const pickablePlaces = useMemo(
+    () => (selectedPlaces.length > 0 ? selectedPlaces : candidates),
+    [selectedPlaces, candidates],
+  );
 
   // Inline "pick from my places" target: which (day, edge) is choosing.
   const [picking, setPicking] = useState<{ index: number; edge: Edge } | null>(null);
@@ -113,14 +119,17 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
 
   const applyCurrentLocation = useCallback(
     async (index: number, edge: Edge) => {
+      const key = draftKey(index, edge);
       setLocating(true);
+      setGeocodeHints((prev) => { const n = { ...prev }; delete n[key]; return n; });
       try {
         const perm = await Location.requestForegroundPermissionsAsync();
         if (perm.status !== 'granted') {
+          setGeocodeHints((prev) => ({ ...prev, [key]: 'Location permission denied — allow it in Settings.' }));
           hapticNotify(NotificationFeedbackType.Warning);
           return;
         }
-        const pos = await Location.getCurrentPositionAsync({});
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const loc: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const patch: DayOverride =
           edge === 'start'
@@ -129,6 +138,10 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
         setDayOverride(index, patch);
         hapticImpact(ImpactFeedbackStyle.Light);
       } catch {
+        setGeocodeHints((prev) => ({
+          ...prev,
+          [key]: "Couldn't get your location. On the simulator set one in Features ▸ Location.",
+        }));
         hapticNotify(NotificationFeedbackType.Error);
       } finally {
         setLocating(false);
@@ -226,11 +239,11 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
                     isDefault={!o.startLocation}
                     busy={locating}
                     picking={isPickingStart}
-                    canPick={selectedPlaces.length > 0}
+                    canPick={pickablePlaces.length > 0}
                     onCurrent={() => void applyCurrentLocation(i, 'start')}
                     onPickToggle={() => setPicking(isPickingStart ? null : { index: i, edge: 'start' })}
                     onDefault={() => applyCityCenter(i, 'start')}
-                    places={selectedPlaces}
+                    places={pickablePlaces}
                     onSelectPlace={(p) => applyPlace(i, 'start', p)}
                     theme={theme}
                     hasCenter={!!center}
@@ -250,11 +263,11 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
                     isDefault={!o.endLocation}
                     busy={locating}
                     picking={isPickingEnd}
-                    canPick={selectedPlaces.length > 0}
+                    canPick={pickablePlaces.length > 0}
                     onCurrent={() => void applyCurrentLocation(i, 'end')}
                     onPickToggle={() => setPicking(isPickingEnd ? null : { index: i, edge: 'end' })}
                     onDefault={() => applyCityCenter(i, 'end')}
-                    places={selectedPlaces}
+                    places={pickablePlaces}
                     onSelectPlace={(p) => applyPlace(i, 'end', p)}
                     theme={theme}
                     hasCenter={!!center}
@@ -372,6 +385,32 @@ function EdgeRow({
           </Pressable>
         ) : null}
       </View>
+
+      {/* Live matches from the loaded places (works offline) — tap to use as the point. */}
+      {addressDraft.trim().length > 0
+        ? (() => {
+            const q = addressDraft.trim().toLowerCase();
+            const matches = places.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 5);
+            return matches.length > 0 ? (
+              <View style={styles.pickList}>
+                {matches.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${p.name}`}
+                    onPress={() => onSelectPlace(p)}
+                    style={[styles.pickRow, { borderColor: theme.colors.glassBorder, borderRadius: theme.radius.sm }]}
+                  >
+                    <IconSymbol name="mappin" size={13} color={theme.colors.accent} fallbackGlyph="📍" />
+                    <Text variant="footnote" tone="onGlass" numberOfLines={1} style={{ flex: 1 }}>
+                      {p.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null;
+          })()
+        : null}
 
       {geocodeHint ? (
         <Text variant="caption" tone="onGlassSecondary" style={{ marginTop: 4, marginLeft: 4 }}>
