@@ -1,0 +1,170 @@
+/**
+ * A selectable candidate row. Shows a category avatar (or photo when available),
+ * name, category, rating, entry price and dwell — with a tactile checkbox.
+ */
+import { useCallback } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+
+import { formatDuration, formatEntry, type CurrencyCode, type Place } from '@/core';
+import { useTheme } from '@/theme';
+import { Text, IconSymbol, RatingStars, hapticSelection } from '@/components/ui';
+import { categoryMeta } from './placeMeta';
+
+export interface PlaceSelectRowProps {
+  place: Place;
+  selected: boolean;
+  currency: CurrencyCode;
+  onToggle: (id: string) => void;
+  /** Optional remove control (e.g. for custom places). */
+  onRemove?: (id: string) => void;
+}
+
+export function PlaceSelectRow({ place, selected, currency, onToggle, onRemove }: PlaceSelectRowProps) {
+  const theme = useTheme();
+  const meta = categoryMeta(place.category);
+  const isFood = place.isFood || ['restaurant', 'cafe', 'bar', 'street-food'].includes(place.category);
+  const accent = isFood ? theme.colors.pinFood : theme.colors.accent;
+
+  const toggle = useCallback(() => {
+    hapticSelection();
+    onToggle(place.id);
+  }, [onToggle, place.id]);
+
+  const priceLabel = formatEntry(place.price, currency);
+
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={place.name}
+      onPress={toggle}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radius.lg,
+          borderColor: selected ? accent : theme.colors.border,
+          borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
+          padding: theme.spacing.md,
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <View style={[styles.avatar, { backgroundColor: isFood ? `${theme.colors.pinFood}1A` : theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+        {place.photoUrl ? (
+          <Image source={{ uri: place.photoUrl }} style={styles.photo} contentFit="cover" transition={150} />
+        ) : (
+          <Text variant="title2">{meta.emoji}</Text>
+        )}
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.titleRow}>
+          <Text variant="headline" numberOfLines={1} style={styles.name}>
+            {place.name}
+          </Text>
+          {place.mustSee ? (
+            <IconSymbol name="heart.fill" size={13} color={theme.colors.danger} fallbackGlyph="♥" />
+          ) : null}
+        </View>
+
+        <Text variant="footnote" tone="secondary" numberOfLines={1} style={{ marginTop: 1 }}>
+          {meta.label}
+          {place.address ? ` · ${place.address.split(',')[0]}` : ''}
+        </Text>
+
+        <View style={styles.metaRow}>
+          {place.rating != null ? <RatingStars rating={place.rating} count={place.userRatingsTotal} /> : null}
+          <Text variant="footnote" tone="tertiary">
+            {priceLabel === '—' ? `${formatDuration(place.dwellMinutes)}` : `${priceLabel} · ${formatDuration(place.dwellMinutes)}`}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.trailing}>
+        {onRemove ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${place.name}`}
+            hitSlop={10}
+            onPress={() => {
+              hapticSelection();
+              onRemove(place.id);
+            }}
+            style={styles.removeBtn}
+          >
+            <IconSymbol name="xmark" size={12} color={theme.colors.textTertiary} />
+          </Pressable>
+        ) : null}
+        <View
+          style={[
+            styles.checkbox,
+            selected
+              ? { backgroundColor: accent, borderColor: accent }
+              : { borderColor: theme.colors.border, backgroundColor: 'transparent' },
+          ]}
+        >
+          {selected ? <IconSymbol name="checkmark" size={14} color={theme.colors.onAccent} weight="bold" /> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+const AV = 52;
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: AV,
+    height: AV,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photo: {
+    width: AV,
+    height: AV,
+  },
+  body: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  name: {
+    flexShrink: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 5,
+  },
+  trailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  removeBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
