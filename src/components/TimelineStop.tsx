@@ -61,11 +61,14 @@ export function TimelineStop({ stop, index, currency, isLast = false }: Timeline
           </View>
         ) : null}
 
-        <GlassCard padding="md" radius="lg" style={isFood ? { borderColor: `${theme.colors.pinFood}55` } : undefined}>
+        <GlassCard padding="md" radius="lg">
+          {isFood ? (
+            <View pointerEvents="none" style={[styles.foodRail, { backgroundColor: theme.colors.pinFood }]} />
+          ) : null}
           <View style={styles.timeRow}>
             <IconSymbol name="clock" size={13} color={accent} fallbackGlyph="🕐" />
             <Text variant="footnote" weight="600" style={{ color: accent }}>
-              {formatMinutes(stop.arrivalMinutes)} – {formatMinutes(stop.departureMinutes)}
+              {formatMinutes(stop.arrivalMinutes)} - {formatMinutes(stop.departureMinutes)}
             </Text>
             {stop.waitMinutes && stop.waitMinutes > 0 ? (
               <Text variant="caption" tone="tertiary">
@@ -178,6 +181,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 8,
+  },
+  foodRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    opacity: 0.85,
   },
   timeRow: {
     flexDirection: 'row',

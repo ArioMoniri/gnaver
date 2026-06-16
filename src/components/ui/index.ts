@@ -6,7 +6,7 @@ export { Button, type ButtonProps } from './Button';
 export { Chip, type ChipProps } from './Chip';
 export { Segmented, type SegmentedProps, type SegmentOption } from './Segmented';
 export { Stepper, type StepperProps } from './Stepper';
-export { GlassCard, type GlassCardProps } from './GlassCard';
+export { GlassCard, GlassSurface, type GlassCardProps, type GlassSurfaceProps, type GlassVariant } from './GlassCard';
 export { Card, type CardProps } from './Card';
 export { IconSymbol, type IconSymbolProps } from './IconSymbol';
 export { Screen, type ScreenProps, type NavBarAction } from './Screen';

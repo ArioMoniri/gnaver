@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate Gnaver's app icon set — Map-first Minimal: an electric-blue location
-pin with a short route trail over a soft map-grid background.
+Generate Gnaver's icon set — a Liquid-Glass mark: a glossy location pin riding a
+luminous route sweep on an electric-blue field, with a specular glass sheen.
 
-Pure PIL (no SVG deps). Supersamples 4x for clean antialiasing. Re-runnable:
+Pure PIL, supersampled 4x for clean edges. Re-runnable:
     python3 scripts/gen_icons.py
 Outputs into assets/images/.
 """
@@ -12,19 +12,21 @@ import os
 from PIL import Image, ImageDraw, ImageFilter
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "images")
-SS = 4  # supersample factor
+SS = 4
 
-ACCENT = (10, 132, 255)      # #0A84FF electric blue
-ACCENT_DK = (0, 102, 221)    # gradient end
-INK = (11, 16, 20)
 WHITE = (255, 255, 255)
+ACCENT = (10, 132, 255)
+PALE = (215, 230, 255)
+LENS = (8, 78, 200)      # the glossy "hole" lens
+FIELD_TOP = (56, 170, 255)
+FIELD_BOT = (8, 92, 220)
 
 
 def lerp(a, b, t):
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def vgradient(size, top, bottom):
+def vgrad(size, top, bottom):
     img = Image.new("RGB", (1, size), top)
     px = img.load()
     for y in range(size):
@@ -32,113 +34,123 @@ def vgradient(size, top, bottom):
     return img.resize((size, size))
 
 
-def draw_pin(draw, cx, cy_head, r, tip_y, fill, hole=None):
-    """Teardrop pin: head circle + tangent triangle to the tip, optional hole."""
-    draw.ellipse([cx - r, cy_head - r, cx + r, cy_head + r], fill=fill)
-    d = tip_y - cy_head
-    if d > r:
-        alpha = math.acos(r / d)            # half-angle of the tangent cone
-        sx, cxx = math.sin(alpha), math.cos(alpha)
-        t1 = (cx - r * sx, cy_head + r * cxx)
-        t2 = (cx + r * sx, cy_head + r * cxx)
-        draw.polygon([t1, (cx, tip_y), t2], fill=fill)
-    if hole:
-        hr = hole
-        draw.ellipse([cx - hr, cy_head - hr, cx + hr, cy_head + hr], fill=WHITE)
+def teardrop_mask(S, cx, cy, r, tip_y):
+    m = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(m)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    dist = tip_y - cy
+    if dist > r:
+        a = math.acos(r / dist)
+        sx, cxx = math.sin(a), math.cos(a)
+        d.polygon([(cx - r * sx, cy + r * cxx), (cx, tip_y), (cx + r * sx, cy + r * cxx)], fill=255)
+    return m
 
 
-def compose(size, with_background=True, pin_scale=1.0):
-    S = size * SS
-    if with_background:
-        base = vgradient(S, (251, 252, 254), (236, 243, 249)).convert("RGBA")
-        # faint map grid
-        grid = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-        gd = ImageDraw.Draw(grid)
-        step = S // 8
-        for i in range(1, 8):
-            gd.line([(i * step, 0), (i * step, S)], fill=(120, 140, 165, 22), width=max(1, SS))
-            gd.line([(0, i * step), (S, i * step)], fill=(120, 140, 165, 22), width=max(1, SS))
-        base = Image.alpha_composite(base, grid)
-        # soft blue glow behind the pin
-        glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-        gdr = ImageDraw.Draw(glow)
-        gr = int(S * 0.30)
-        gdr.ellipse([S // 2 - gr, int(S * 0.42) - gr, S // 2 + gr, int(S * 0.42) + gr],
-                    fill=(10, 132, 255, 46))
-        glow = glow.filter(ImageFilter.GaussianBlur(S // 18))
-        base = Image.alpha_composite(base, glow)
+def soft_circle(S, x, y, r, color, blur):
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    d.ellipse([x - r, y - r, x + r, y + r], fill=color)
+    return layer.filter(ImageFilter.GaussianBlur(blur)) if blur else layer
+
+
+def build(mode):
+    """mode 'app' = white pin on blue field; 'glyph' = blue pin on transparent."""
+    S = 1024 * SS
+    cx = S // 2
+    r = int(S * (0.205 if mode == "app" else 0.150))
+    cy = int(S * 0.385)
+    tip_y = cy + int(r * 1.72)
+
+    if mode == "app":
+        base = vgrad(S, FIELD_TOP, FIELD_BOT).convert("RGBA")
+        # top light source + bottom vignette for depth
+        base = Image.alpha_composite(base, soft_circle(S, cx, int(S * 0.12), int(S * 0.5), (255, 255, 255, 60), S // 8))
+        base = Image.alpha_composite(base, soft_circle(S, cx, int(S * 1.02), int(S * 0.55), (3, 40, 110, 120), S // 7))
+        pin_top, pin_bot = WHITE, PALE
+        hole_color = LENS
+        route_color = (255, 255, 255, 255)
+        glow_color = (255, 255, 255, 150)
     else:
         base = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        pin_top, pin_bot = (90, 175, 255), ACCENT
+        hole_color = (255, 255, 255, 255)
+        route_color = ACCENT + (255,)
+        glow_color = ACCENT + (120,)
 
-    cx = S // 2
-    r = int(S * 0.195 * pin_scale)
-    cy_head = int(S * 0.40)
-    tip_y = int(S * 0.74 * (1 if with_background else 1))
-    tip_y = cy_head + int(r * 1.65)
+    # ── route sweep: glowing dots curving up into the pin tip ──
+    route = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    rd = ImageDraw.Draw(route)
+    pts = [(cx - int(r * 1.55), tip_y + int(r * 0.55)),
+           (cx - int(r * 1.02), tip_y + int(r * 0.42)),
+           (cx - int(r * 0.52), tip_y + int(r * 0.16))]
+    glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for i, (x, y) in enumerate(pts):
+        rr = int(r * (0.22 - i * 0.035))
+        gd.ellipse([x - rr * 2, y - rr * 2, x + rr * 2, y + rr * 2], fill=glow_color)
+    glow = glow.filter(ImageFilter.GaussianBlur(S // 60))
+    for i, (x, y) in enumerate(pts):
+        rr = int(r * (0.20 - i * 0.032))
+        rd.ellipse([x - rr, y - rr, x + rr, y + rr], fill=route_color)
 
-    # drop shadow
-    shadow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.ellipse([cx - r * 0.9, tip_y - r * 0.18, cx + r * 0.9, tip_y + r * 0.28],
-               fill=(11, 16, 20, 70))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(S // 40))
-    base = Image.alpha_composite(base, shadow)
+    # ── shadow under the pin ──
+    shadow = soft_circle(S, cx, tip_y + int(r * 0.05), int(r * 0.7), (3, 30, 90, 150), S // 34)
+    if mode != "app":
+        shadow = soft_circle(S, cx, tip_y, int(r * 0.5), (10, 40, 90, 70), S // 40)
 
+    # ── pin body: glossy gradient fill via mask ──
+    pin_mask = teardrop_mask(S, cx, cy, r, tip_y)
+    pin_fill = vgrad(S, pin_top, pin_bot).convert("RGBA")
     pin = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    pd = ImageDraw.Draw(pin)
+    pin.paste(pin_fill, (0, 0), pin_mask)
 
-    # route trail leading into the pin
-    trail = [(cx - int(r * 1.25), tip_y + int(r * 0.30)),
-             (cx - int(r * 0.78), tip_y + int(r * 0.12)),
-             (cx - int(r * 0.34), tip_y - int(r * 0.10))]
-    for i, (x, y) in enumerate(trail):
-        rr = int(r * (0.20 - i * 0.03))
-        pd.ellipse([x - rr, y - rr, x + rr, y + rr], fill=ACCENT)
+    # inner specular highlight (top-left of the head)
+    hi = soft_circle(S, cx - int(r * 0.34), cy - int(r * 0.42), int(r * 0.55), (255, 255, 255, 150), S // 50)
+    hi_clip = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    hi_clip.paste(hi, (0, 0), pin_mask)
+    pin = Image.alpha_composite(pin, hi_clip)
 
-    # pin with a vertical-gradient blue fill (draw solid then mask a gradient)
-    draw_pin(pd, cx, cy_head, r, tip_y, ACCENT, hole=int(r * 0.40))
-    grad = vgradient(S, ACCENT, ACCENT_DK).convert("RGBA")
-    mask = Image.new("L", (S, S), 0)
-    md = ImageDraw.Draw(mask)
-    draw_pin(md, cx, cy_head, r, tip_y, 255, hole=None)
-    hole = Image.new("L", (S, S), 0)
-    hd = ImageDraw.Draw(hole)
+    # glossy hole/lens
     hr = int(r * 0.40)
-    hd.ellipse([cx - hr, cy_head - hr, cx + hr, cy_head + hr], fill=255)
-    grad_pin = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    grad_pin.paste(grad, (0, 0), mask)
-    white_hole = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    white_hole.paste(Image.new("RGBA", (S, S), WHITE + (255,)), (0, 0), hole)
-    pin = Image.alpha_composite(grad_pin, white_hole)
-    # re-draw the trail on top so it isn't covered by the gradient pin layer
-    pin_trail = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ptd = ImageDraw.Draw(pin_trail)
-    for i, (x, y) in enumerate(trail):
-        rr = int(r * (0.20 - i * 0.03))
-        ptd.ellipse([x - rr, y - rr, x + rr, y + rr], fill=ACCENT + (255,))
-    out = Image.alpha_composite(base, pin_trail)
+    lens = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(lens)
+    ld.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill=hole_color + ((255,) if len(hole_color) == 3 else ()))
+    if mode == "app":
+        ld.ellipse([cx - hr, cy - hr, cx + int(hr * 0.2), cy + int(hr * 0.1)], fill=(40, 120, 230, 200))
+    pin = Image.alpha_composite(pin, lens)
+
+    out = Image.alpha_composite(base, shadow)
+    out = Image.alpha_composite(out, glow)
+    out = Image.alpha_composite(out, route)
     out = Image.alpha_composite(out, pin)
-    return out.resize((size, size), Image.LANCZOS)
+
+    # ── glass sheen sweep across the top (app only) ──
+    if mode == "app":
+        sheen = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(sheen)
+        sd.ellipse([-int(S * 0.3), -int(S * 0.95), int(S * 1.3), int(S * 0.42)], fill=(255, 255, 255, 42))
+        sheen = sheen.filter(ImageFilter.GaussianBlur(S // 90))
+        out = Image.alpha_composite(out, sheen)
+
+    return out.resize((1024, 1024), Image.LANCZOS)
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    app = build("app").convert("RGB")  # App Store icon: opaque, no alpha
+    app.save(os.path.join(OUT, "icon.png"))
+    app.resize((196, 196), Image.LANCZOS).save(os.path.join(OUT, "favicon.png"))
 
-    icon = compose(1024, with_background=True).convert("RGB")  # App Store: no alpha
-    icon.save(os.path.join(OUT, "icon.png"))
-
-    fg = compose(1024, with_background=False, pin_scale=0.66)   # adaptive safe zone
+    glyph = build("glyph")  # tinted pin on transparent
+    # adaptive foreground: extra safe-zone padding
+    fg = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+    g = glyph.resize((int(1024 * 0.72), int(1024 * 0.72)), Image.LANCZOS)
+    fg.alpha_composite(g, (int((1024 - g.width) / 2), int((1024 - g.height) / 2)))
     fg.save(os.path.join(OUT, "android-icon-foreground.png"))
+    glyph.save(os.path.join(OUT, "splash-icon.png"))
 
-    splash = compose(1024, with_background=False, pin_scale=0.92)
-    splash.save(os.path.join(OUT, "splash-icon.png"))
-
-    icon.resize((196, 196), Image.LANCZOS).save(os.path.join(OUT, "favicon.png"))
-
-    # solid brand background for the adaptive icon
-    Image.new("RGB", (1024, 1024), WHITE).save(os.path.join(OUT, "android-icon-background.png"))
-
-    print("Wrote icon.png, android-icon-foreground.png, splash-icon.png, favicon.png, android-icon-background.png")
+    Image.new("RGB", (1024, 1024), "#FFFFFF").save(os.path.join(OUT, "android-icon-background.png"))
+    print("Wrote icon.png, favicon.png, android-icon-foreground.png, splash-icon.png, android-icon-background.png")
 
 
 if __name__ == "__main__":

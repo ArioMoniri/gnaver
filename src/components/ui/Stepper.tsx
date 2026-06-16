@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 import { IconSymbol } from './IconSymbol';
+import { GlassSurface } from './GlassCard';
 import { hapticSelection } from './haptics';
 
 export interface StepperProps {
@@ -63,38 +64,35 @@ export function Stepper({
           {label}
         </Text>
       ) : null}
-      <View
-        style={[
-          styles.control,
-          { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.pill },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Decrease"
-          onPress={dec}
-          disabled={atMin}
-          style={[styles.btn, atMin && styles.disabled]}
-          hitSlop={6}
-        >
-          <IconSymbol name="minus" size={16} color={theme.colors.text} weight="semibold" />
-        </Pressable>
-        <View style={styles.valueBox}>
-          <Text variant="subhead" weight="600" align="center">
-            {display}
-          </Text>
+      <GlassSurface variant="chip" radius="pill" padding="none" sheen={false} style={{ borderRadius: theme.radius.pill }}>
+        <View style={styles.control}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Decrease"
+            onPress={dec}
+            disabled={atMin}
+            style={[styles.btn, atMin && styles.disabled]}
+            hitSlop={6}
+          >
+            <IconSymbol name="minus" size={16} color={theme.colors.onGlass} weight="semibold" />
+          </Pressable>
+          <View style={styles.valueBox}>
+            <Text variant="subhead" weight="700" align="center" tone="onGlass">
+              {display}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Increase"
+            onPress={inc}
+            disabled={atMax}
+            style={[styles.btn, atMax && styles.disabled]}
+            hitSlop={6}
+          >
+            <IconSymbol name="plus" size={16} color={theme.colors.onGlass} weight="semibold" />
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Increase"
-          onPress={inc}
-          disabled={atMax}
-          style={[styles.btn, atMax && styles.disabled]}
-          hitSlop={6}
-        >
-          <IconSymbol name="plus" size={16} color={theme.colors.text} weight="semibold" />
-        </Pressable>
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -112,7 +110,6 @@ const styles = StyleSheet.create({
   control: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   btn: {
     width: 40,

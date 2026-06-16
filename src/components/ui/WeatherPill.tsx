@@ -9,11 +9,14 @@ import type { DayWeather, WeatherCondition } from '@/core';
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 import { IconSymbol } from './IconSymbol';
+import { GlassSurface } from './GlassCard';
 
 export interface WeatherPillProps {
   weather?: DayWeather;
   /** Compact form: just symbol + max temp (used on the day strip). */
   compact?: boolean;
+  /** Float the full pill over the map as Liquid Glass. */
+  glass?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -27,7 +30,7 @@ const SYMBOL: Record<WeatherCondition, { name: SFSymbol; glyph: string }> = {
   unknown: { name: 'thermometer.medium', glyph: '🌡' },
 };
 
-export function WeatherPill({ weather, compact = false, style }: WeatherPillProps) {
+export function WeatherPill({ weather, compact = false, glass = false, style }: WeatherPillProps) {
   const theme = useTheme();
   if (!weather) return null;
 
@@ -47,6 +50,31 @@ export function WeatherPill({ weather, compact = false, style }: WeatherPillProp
     );
   }
 
+  const body = (
+    <>
+      <IconSymbol name={sym.name} size={15} color={theme.colors.accent} fallbackGlyph={sym.glyph} />
+      <Text variant="footnote" weight="600" tone={glass ? 'onGlass' : 'primary'}>
+        {max}°
+      </Text>
+      <Text variant="footnote" tone={glass ? 'onGlassSecondary' : 'tertiary'}>
+        / {min}°
+      </Text>
+      {wet ? (
+        <Text variant="footnote" tone={glass ? 'onGlassSecondary' : 'secondary'}>
+          · {Math.round(weather.precipitationProbability)}% rain
+        </Text>
+      ) : null}
+    </>
+  );
+
+  if (glass) {
+    return (
+      <GlassSurface variant="chip" radius="pill" padding="none" sheen={false} style={style}>
+        <View style={styles.glassPad}>{body}</View>
+      </GlassSurface>
+    );
+  }
+
   return (
     <View
       style={[
@@ -55,18 +83,7 @@ export function WeatherPill({ weather, compact = false, style }: WeatherPillProp
         style,
       ]}
     >
-      <IconSymbol name={sym.name} size={15} color={theme.colors.accent} fallbackGlyph={sym.glyph} />
-      <Text variant="footnote" weight="600">
-        {max}°
-      </Text>
-      <Text variant="footnote" tone="tertiary">
-        / {min}°
-      </Text>
-      {wet ? (
-        <Text variant="footnote" tone="secondary">
-          · {Math.round(weather.precipitationProbability)}% rain
-        </Text>
-      ) : null}
+      {body}
     </View>
   );
 }
@@ -84,5 +101,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  glassPad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
 });

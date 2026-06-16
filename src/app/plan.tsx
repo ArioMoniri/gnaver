@@ -3,10 +3,11 @@
  * strip, then a sheet with the day summary and the time-by-time timeline. Open
  * the route in Google Maps or copy the link; edit places or start over.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
 import { formatCostSummary, formatDistance, formatDuration, type DayPlan } from '@/core';
@@ -16,7 +17,7 @@ import {
   Button,
   DayTabStrip,
   EmptyState,
-  GlassCard,
+  GlassSurface,
   IconSymbol,
   Screen,
   Tag,
@@ -138,44 +139,76 @@ export default function PlanScreen() {
       {/* Map */}
       <View style={[styles.mapWrap, { height: mapHeight }]}>
         <TripMap stops={mapStops} center={center} fitKey={safeDay} />
+
+        {/* Subtle scrim so glass chrome reads over busy map detail. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={[theme.colors.scrim, 'transparent']}
+          style={[styles.scrimTop, { height: insets.top + 64 }]}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={['transparent', theme.colors.scrim]}
+          style={styles.scrimBottom}
+        />
+
         {/* Back chip floating over the map */}
         <View style={[styles.backChip, { top: insets.top + 8 }]}>
-          <GlassCard padding="none" radius="pill" floating style={styles.backChipInner}>
-            <Button
-              title={title.length > 22 ? `${title.slice(0, 20).trimEnd()}…` : title}
-              variant="ghost"
-              size="sm"
-              icon="chevron.left"
-              iconFallback="‹"
-              onPress={() => router.back()}
-            />
-          </GlassCard>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()}>
+            <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false} floating>
+              <View style={styles.backInner}>
+                <IconSymbol name="chevron.left" size={16} color={theme.colors.onGlass} weight="semibold" fallbackGlyph="‹" />
+                <Text variant="subhead" weight="600" tone="onGlass" numberOfLines={1}>
+                  {title.length > 22 ? `${title.slice(0, 20).trimEnd()}…` : title}
+                </Text>
+              </View>
+            </GlassSurface>
+          </Pressable>
         </View>
       </View>
 
       {/* Floating day strip overlapping the map's bottom edge */}
-      <View style={[styles.stripWrap, { top: mapHeight - 32 }]}>
+      <View style={[styles.stripWrap, { top: mapHeight - 34 }]}>
         <DayTabStrip days={days} activeDay={safeDay} onSelect={onSelectDay} />
       </View>
 
       {/* Sheet */}
-      <View style={[styles.sheet, { backgroundColor: theme.colors.background, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, marginTop: -24 }]}>
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: theme.colors.background,
+            borderTopLeftRadius: theme.radius.xl,
+            borderTopRightRadius: theme.radius.xl,
+            marginTop: -26,
+          },
+        ]}
+      >
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.lg,
             paddingTop: theme.spacing.xxl,
-            paddingBottom: insets.bottom + theme.spacing.xxl,
+            paddingBottom: insets.bottom + 108,
           }}
           showsVerticalScrollIndicator={false}
         >
           {day ? (
             <>
-              {/* Summary chips */}
-              <View style={styles.summaryRow}>
-                <Tag label={formatCostSummary(day.totalCost)} tone="accent" icon="eurosign.circle.fill" iconFallback="€" />
-                <Tag label={formatDistance(day.totalDistanceMeters)} tone="neutral" icon="arrow.triangle.turn.up.right.diamond.fill" iconFallback="↝" />
-                <Tag label={formatDuration(day.totalTravelMinutes)} tone="neutral" icon="figure.walk" iconFallback="🚶" />
-                {day.weather ? <WeatherPill weather={day.weather} /> : null}
+              {/* Cost hero + supporting chips */}
+              <View style={styles.summaryWrap}>
+                <View>
+                  <Text variant="caption" tone="tertiary" weight="700" style={styles.summaryLabel}>
+                    DAY COST
+                  </Text>
+                  <Text variant="title" tone="accent">
+                    {formatCostSummary(day.totalCost)}
+                  </Text>
+                </View>
+                <View style={styles.summaryChips}>
+                  <Tag label={formatDistance(day.totalDistanceMeters)} tone="neutral" icon="arrow.triangle.turn.up.right.diamond.fill" iconFallback="↝" />
+                  <Tag label={formatDuration(day.totalTravelMinutes)} tone="neutral" icon="figure.walk" iconFallback="🚶" />
+                  {day.weather ? <WeatherPill weather={day.weather} /> : null}
+                </View>
               </View>
 
               {day.warnings && day.warnings.length > 0 ? (
@@ -211,25 +244,6 @@ export default function PlanScreen() {
                   {dayUnscheduled} {dayUnscheduled === 1 ? "place didn't" : "places didn't"} fit this day
                 </Text>
               ) : null}
-
-              {/* Day actions */}
-              <View style={styles.dayActions}>
-                <Button
-                  title="Open in Google Maps"
-                  variant="secondary"
-                  icon="map.fill"
-                  iconFallback="🗺"
-                  onPress={onOpenMaps}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  title="Copy link"
-                  variant="ghost"
-                  icon="doc.on.doc"
-                  iconFallback="⧉"
-                  onPress={onCopyLink}
-                />
-              </View>
             </>
           ) : null}
 
@@ -241,12 +255,32 @@ export default function PlanScreen() {
             </View>
           ) : null}
 
-          {/* Bottom actions */}
+          {/* Secondary actions */}
           <View style={styles.bottomActions}>
             <Button title="Edit places" variant="ghost" icon="arrow.triangle.2.circlepath" iconFallback="↺" onPress={onEdit} />
-            <Button title="New trip" variant="secondary" onPress={onNewTrip} />
+            <Button title="New trip" variant="ghost" onPress={onNewTrip} />
           </View>
         </ScrollView>
+      </View>
+
+      {/* Sticky glass action bar */}
+      <View style={[styles.actionBarWrap, { paddingBottom: insets.bottom + theme.spacing.sm, paddingHorizontal: theme.spacing.lg }]}>
+        <GlassSurface variant="bar" radius="xxl" padding="sm" floating style={styles.actionBar}>
+          <Button
+            title="Open in Google Maps"
+            icon="map.fill"
+            iconFallback="🗺"
+            onPress={onOpenMaps}
+            style={{ flex: 1 }}
+          />
+          <Pressable accessibilityRole="button" accessibilityLabel="Copy day link" onPress={onCopyLink}>
+            <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false}>
+              <View style={styles.copyBtn}>
+                <IconSymbol name="doc.on.doc" size={18} color={theme.colors.onGlass} weight="semibold" fallbackGlyph="⧉" />
+              </View>
+            </GlassSurface>
+          </Pressable>
+        </GlassSurface>
       </View>
 
       {/* Toast */}
@@ -255,18 +289,20 @@ export default function PlanScreen() {
         style={[
           styles.toast,
           {
-            bottom: insets.bottom + 28,
+            bottom: insets.bottom + 88,
             opacity: toast,
             transform: [{ translateY: toast.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
           },
         ]}
       >
-        <GlassCard padding="sm" radius="pill" floating style={styles.toastInner}>
-          <IconSymbol name="checkmark.circle.fill" size={16} color={theme.colors.success} fallbackGlyph="✓" />
-          <Text variant="footnote" weight="600">
-            {toastText}
-          </Text>
-        </GlassCard>
+        <GlassSurface variant="chip" radius="pill" padding="none" sheen={false} floating>
+          <View style={styles.toastInner}>
+            <IconSymbol name="checkmark.circle.fill" size={16} color={theme.colors.success} fallbackGlyph="✓" />
+            <Text variant="footnote" weight="600" tone="onGlass">
+              {toastText}
+            </Text>
+          </View>
+        </GlassSurface>
       </Animated.View>
     </View>
   );
@@ -279,12 +315,30 @@ const styles = StyleSheet.create({
   mapWrap: {
     width: '100%',
   },
+  scrimTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  scrimBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+  },
   backChip: {
     position: 'absolute',
     left: 12,
+    maxWidth: '70%',
   },
-  backChipInner: {
-    overflow: 'hidden',
+  backInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
   stripWrap: {
     position: 'absolute',
@@ -296,24 +350,31 @@ const styles = StyleSheet.create({
   sheet: {
     flex: 1,
   },
-  summaryRow: {
+  summaryWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  summaryLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  summaryChips: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 8,
+    flexShrink: 1,
   },
   dayWarn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     padding: 10,
-    marginTop: 12,
-  },
-  dayActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 20,
+    marginTop: 14,
   },
   tripUnsched: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -324,7 +385,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 20,
+  },
+  actionBarWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 8,
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  copyBtn: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toast: {
     position: 'absolute',
@@ -337,5 +416,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
+    paddingVertical: 9,
   },
 });

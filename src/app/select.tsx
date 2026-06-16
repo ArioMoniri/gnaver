@@ -13,7 +13,7 @@ import { useTrip } from '@/store/tripStore';
 import {
   Button,
   EmptyState,
-  GlassCard,
+  GlassSurface,
   IconSymbol,
   LoadingOverlay,
   PlaceSelectRow,
@@ -198,12 +198,12 @@ export default function SelectScreen() {
       {/* Sticky optimise bar */}
       {candidates.length > 0 ? (
         <View style={[styles.bar, { paddingBottom: insets.bottom + theme.spacing.sm, paddingHorizontal: theme.spacing.lg }]}>
-          <GlassCard padding="sm" radius="xl" floating style={styles.barCard}>
+          <GlassSurface variant="bar" radius="xxl" padding="sm" floating style={styles.barCard}>
             <View style={{ flex: 1 }}>
-              <Text variant="footnote" tone="secondary">
+              <Text variant="footnote" tone="onGlassSecondary">
                 {selectedCount} {selectedCount === 1 ? 'place' : 'places'}
               </Text>
-              <Text variant="subhead" weight="600">
+              <Text variant="subhead" weight="600" tone="onGlass">
                 Ready to optimise
               </Text>
             </View>
@@ -216,7 +216,7 @@ export default function SelectScreen() {
               loading={generating}
               onPress={onOptimize}
             />
-          </GlassCard>
+          </GlassSurface>
         </View>
       ) : null}
 

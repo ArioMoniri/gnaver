@@ -7,6 +7,7 @@ import { Text as RNText, type TextProps as RNTextProps, type TextStyle } from 'r
 import { useTheme } from '@/theme';
 
 type Variant =
+  | 'hero'
   | 'display'
   | 'title'
   | 'title2'
@@ -17,7 +18,16 @@ type Variant =
   | 'footnote'
   | 'caption';
 
-type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'onAccent' | 'danger' | 'success';
+type Tone =
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'accent'
+  | 'onAccent'
+  | 'onGlass'
+  | 'onGlassSecondary'
+  | 'danger'
+  | 'success';
 
 export interface TextProps extends RNTextProps {
   variant?: Variant;
@@ -49,7 +59,11 @@ export function Text({
           ? theme.colors.accent
           : tone === 'onAccent'
             ? theme.colors.onAccent
-            : tone === 'danger'
+            : tone === 'onGlass'
+              ? theme.colors.onGlass
+              : tone === 'onGlassSecondary'
+                ? theme.colors.onGlassSecondary
+                : tone === 'danger'
               ? theme.colors.danger
               : tone === 'success'
                 ? theme.colors.success

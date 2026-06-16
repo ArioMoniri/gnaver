@@ -3,10 +3,11 @@
  * tune the trip setup (interests, transport, pace, days, hours, food). Seeds the
  * trip store from saved settings on mount and pushes to /select when ready.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
 import { formatMinutes, type FoodBudget, type Interest, type Pace, type TransportMode } from '@/core';
@@ -17,9 +18,9 @@ import { useSettings } from '@/store/settingsStore';
 import {
   ALL_INTERESTS,
   Button,
-  Card,
   Chip,
   GlassCard,
+  GlassSurface,
   IconSymbol,
   Segmented,
   Stepper,
@@ -131,22 +132,44 @@ export default function NewTripScreen() {
   }, [canContinue, router]);
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.root}>
+      {/* Hero background wash */}
+      <LinearGradient
+        colors={theme.gradients.hero as unknown as readonly [string, string]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={theme.gradients.accentWash as unknown as readonly [string, string]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 0.5 }}
+        style={[StyleSheet.absoluteFill, { height: 320 }]}
+      />
+
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top + theme.spacing.sm,
+          paddingTop: insets.top + theme.spacing.md,
           paddingHorizontal: theme.spacing.xl,
-          paddingBottom: insets.bottom + 120,
+          paddingBottom: insets.bottom + 132,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Hero header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text variant="display" tracking={0.2}>
-              Gnaver
-            </Text>
-            <Text variant="callout" tone="secondary" style={{ marginTop: 2 }}>
+            <View style={styles.brandRow}>
+              <LinearGradient
+                colors={theme.gradients.brand as unknown as readonly [string, string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.glyph, theme.elevation.card]}
+              >
+                <View pointerEvents="none" style={[styles.glyphSpec, { backgroundColor: theme.colors.glassStroke }]} />
+                <IconSymbol name="map.fill" size={22} color={theme.colors.onAccent} fallbackGlyph="🗺" />
+              </LinearGradient>
+              <Text variant="hero">Gnaver</Text>
+            </View>
+            <Text variant="callout" tone="secondary" style={{ marginTop: theme.spacing.sm }}>
               Turn a wishlist into the perfect day-by-day route.
             </Text>
           </View>
@@ -158,9 +181,12 @@ export default function NewTripScreen() {
               hapticSelection();
               router.push('/settings');
             }}
-            style={[styles.gear, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
           >
-            <IconSymbol name="gearshape.fill" size={20} color={theme.colors.text} />
+            <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false} style={styles.gearWrap}>
+              <View style={styles.gear}>
+                <IconSymbol name="gearshape.fill" size={20} color={theme.colors.onGlass} />
+              </View>
+            </GlassSurface>
           </Pressable>
         </View>
 
@@ -181,61 +207,28 @@ export default function NewTripScreen() {
             {cities.map((city) => {
               const active = trip.cityId === city.id && trip.source === 'city';
               return (
-                <Pressable
+                <CityCard
                   key={city.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
+                  emoji={city.emoji}
+                  name={city.name}
+                  country={city.country}
+                  blurb={city.blurb}
+                  active={active}
                   onPress={() => {
                     hapticSelection();
                     void trip.startFromCity(city.id);
                   }}
-                  style={[
-                    styles.cityRow,
-                    {
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: theme.radius.lg,
-                      borderColor: active ? theme.colors.accent : theme.colors.border,
-                      borderWidth: active ? 1.5 : StyleSheet.hairlineWidth,
-                      padding: theme.spacing.lg,
-                    },
-                    active ? theme.elevation.card : undefined,
-                  ]}
-                >
-                  <Text variant="title" style={styles.cityEmoji}>
-                    {city.emoji}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.cityTitleRow}>
-                      <Text variant="headline">{city.name}</Text>
-                      <Text variant="footnote" tone="tertiary">
-                        {city.country}
-                      </Text>
-                    </View>
-                    <Text variant="footnote" tone="secondary" numberOfLines={2} style={{ marginTop: 2 }}>
-                      {city.blurb}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.radio,
-                      active
-                        ? { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent }
-                        : { borderColor: theme.colors.border },
-                    ]}
-                  >
-                    {active ? <IconSymbol name="checkmark" size={13} color={theme.colors.onAccent} weight="bold" /> : null}
-                  </View>
-                </Pressable>
+                />
               );
             })}
           </View>
         ) : (
           <View style={{ marginTop: theme.spacing.lg }}>
-            <Card padding="lg" radius="lg" bordered elevated={false}>
+            <GlassCard padding="lg" radius="xl" floating>
               <Text variant="subhead" weight="600">
                 Paste a Google Maps list link
               </Text>
-              <Text variant="footnote" tone="secondary" style={{ marginTop: 2 }}>
+              <Text variant="footnote" tone="onGlassSecondary" style={{ marginTop: 2 }}>
                 A shared saved-places list or a maps.app.goo.gl link.
               </Text>
               <View
@@ -297,7 +290,7 @@ export default function NewTripScreen() {
                   </Text>
                 </View>
               ) : null}
-            </Card>
+            </GlassCard>
           </View>
         )}
 
@@ -343,13 +336,7 @@ export default function NewTripScreen() {
             </View>
 
             <View style={styles.field}>
-              <Stepper
-                label="Days"
-                value={trip.dayCount}
-                min={1}
-                max={14}
-                onChange={(n) => trip.setDayCount(n)}
-              />
+              <Stepper label="Days" value={trip.dayCount} min={1} max={14} onChange={(n) => trip.setDayCount(n)} />
             </View>
 
             <View style={styles.field}>
@@ -380,7 +367,7 @@ export default function NewTripScreen() {
                 <Text variant="subhead" weight="600">
                   Include food stops
                 </Text>
-                <Text variant="caption" tone="secondary">
+                <Text variant="caption" tone="onGlassSecondary">
                   Weave in cafés and restaurants around mealtimes.
                 </Text>
               </View>
@@ -410,36 +397,106 @@ export default function NewTripScreen() {
         </View>
       </ScrollView>
 
-      {/* Sticky CTA */}
-      <View
-        style={[
-          styles.cta,
-          {
-            paddingBottom: insets.bottom + theme.spacing.md,
-            paddingHorizontal: theme.spacing.xl,
-            backgroundColor: theme.colors.background,
-            borderTopColor: theme.colors.border,
-          },
-        ]}
-      >
-        <Button
-          title="Find places"
-          icon="arrow.right"
-          iconFallback="→"
-          trailingIcon
-          fullWidth
-          size="lg"
-          disabled={!canContinue}
-          onPress={onContinue}
-        />
+      {/* Sticky glass CTA bar */}
+      <View style={[styles.cta, { paddingBottom: insets.bottom + theme.spacing.md, paddingHorizontal: theme.spacing.xl }]}>
+        <GlassSurface variant="bar" radius="xxl" padding="md" floating style={styles.ctaBar}>
+          <Button
+            title="Find places"
+            icon="arrow.right"
+            iconFallback="→"
+            trailingIcon
+            fullWidth
+            size="lg"
+            disabled={!canContinue}
+            onPress={onContinue}
+          />
+        </GlassSurface>
       </View>
     </View>
   );
 }
 
+function CityCard({
+  emoji,
+  name,
+  country,
+  blurb,
+  active,
+  onPress,
+}: {
+  emoji: string;
+  name: string;
+  country: string;
+  blurb: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  const animateTo = (to: number) =>
+    Animated.spring(scale, {
+      toValue: to,
+      useNativeDriver: true,
+      damping: theme.motion.springBouncy.damping,
+      stiffness: theme.motion.springBouncy.stiffness,
+      mass: theme.motion.springBouncy.mass,
+    }).start();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        onPressIn={() => animateTo(0.97)}
+        onPressOut={() => animateTo(1)}
+      >
+        <GlassCard
+          padding="md"
+          radius="lg"
+          floating={active}
+          style={active ? { borderColor: theme.colors.accent, borderWidth: 1.5 } : undefined}
+        >
+          <View style={styles.cityRow}>
+            <View style={[styles.cityEmojiWrap, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+              <Text style={styles.cityEmoji}>{emoji}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.cityTitleRow}>
+                <Text variant="headline">{name}</Text>
+                <Text variant="footnote" tone="onGlassSecondary">
+                  {country}
+                </Text>
+              </View>
+              <Text variant="footnote" tone="onGlassSecondary" numberOfLines={2} style={{ marginTop: 2 }}>
+                {blurb}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.radio,
+                active
+                  ? { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent }
+                  : { borderColor: theme.colors.glassBorder },
+              ]}
+            >
+              {active ? <IconSymbol name="checkmark" size={13} color={theme.colors.onAccent} weight="bold" /> : null}
+            </View>
+          </View>
+        </GlassCard>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 function SectionLabel({ children, theme }: { children: string; theme: ReturnType<typeof useTheme> }) {
   return (
-    <Text variant="caption" tone="tertiary" weight="600" style={{ marginBottom: theme.spacing.sm, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+    <Text
+      variant="caption"
+      tone="onGlassSecondary"
+      weight="700"
+      style={{ marginBottom: theme.spacing.sm, textTransform: 'uppercase', letterSpacing: 0.6 }}
+    >
       {children}
     </Text>
   );
@@ -454,21 +511,49 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  glyph: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  glyphSpec: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth * 2,
+    opacity: 0.7,
+  },
+  gearWrap: {
+    borderRadius: 22,
+  },
   gear: {
     width: 44,
     height: 44,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   cityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
+  cityEmojiWrap: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cityEmoji: {
-    fontSize: 30,
+    fontSize: 28,
   },
   cityTitleRow: {
     flexDirection: 'row',
@@ -530,6 +615,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  ctaBar: {
+    overflow: 'visible',
   },
 });

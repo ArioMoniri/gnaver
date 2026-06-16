@@ -14,8 +14,8 @@ import { useSettings } from '@/store/settingsStore';
 import {
   ALL_INTERESTS,
   Button,
-  Card,
   Chip,
+  GlassCard,
   IconSymbol,
   Screen,
   Segmented,
@@ -215,22 +215,20 @@ export default function SettingsScreen() {
 
         {/* Data sources */}
         <Section title="Data sources" subtitle={describeProviders()} theme={theme}>
-          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Google" mockLabel="Sample data" theme={theme} />
+          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Google" mockLabel="Sample data" first theme={theme} />
           <FeatureRow label="Weather" live={features.liveWeather} liveLabel="Open-Meteo" mockLabel="Mock" theme={theme} />
           <FeatureRow label="Taste recommender" live={features.liveTaste} liveLabel="LLM" mockLabel="Heuristic" theme={theme} />
         </Section>
 
         {/* About */}
         <Section title="About" theme={theme}>
-          <Card padding="lg" radius="lg" bordered elevated={false}>
-            <View style={styles.aboutRow}>
-              <Text variant="headline">Gnaver</Text>
-              <Tag label="v1.0.0" tone="accent" />
-            </View>
-            <Text variant="footnote" tone="secondary" style={{ marginTop: 4 }}>
-              A map-first travel-itinerary optimizer. Designed & built by Ario Moniri.
-            </Text>
-          </Card>
+          <View style={styles.aboutRow}>
+            <Text variant="headline">Gnaver</Text>
+            <Tag label="v1.0.0" tone="accent" />
+          </View>
+          <Text variant="footnote" tone="onGlassSecondary" style={{ marginTop: 4 }}>
+            A map-first travel-itinerary optimizer. Designed & built by Ario Moniri.
+          </Text>
           <Button
             title="Reset to defaults"
             variant="ghost"
@@ -256,15 +254,23 @@ function Section({
 }) {
   return (
     <View>
-      <Text variant="title2">{title}</Text>
+      <Text variant="title2" style={{ marginLeft: theme.spacing.xs }}>
+        {title}
+      </Text>
       {subtitle ? (
-        <Text variant="footnote" tone="secondary" style={{ marginTop: 2, marginBottom: theme.spacing.md }}>
+        <Text
+          variant="footnote"
+          tone="secondary"
+          style={{ marginTop: 2, marginBottom: theme.spacing.md, marginLeft: theme.spacing.xs }}
+        >
           {subtitle}
         </Text>
       ) : (
         <View style={{ height: theme.spacing.md }} />
       )}
-      {children}
+      <GlassCard padding="lg" radius="xl">
+        {children}
+      </GlassCard>
     </View>
   );
 }
@@ -313,7 +319,7 @@ function CommaInput({
       onEndEditing={(e) => onCommit(e.nativeEvent.text)}
       style={[
         styles.input,
-        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md, color: theme.colors.text },
+        { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderRadius: theme.radius.md, color: theme.colors.text },
       ]}
     />
   );
@@ -324,16 +330,18 @@ function FeatureRow({
   live,
   liveLabel,
   mockLabel,
+  first,
   theme,
 }: {
   label: string;
   live: boolean;
   liveLabel: string;
   mockLabel: string;
+  first?: boolean;
   theme: ReturnType<typeof useTheme>;
 }) {
   return (
-    <View style={[styles.featureRow, { borderColor: theme.colors.border }]}>
+    <View style={[styles.featureRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border }]}>
       <IconSymbol
         name={live ? 'dot.radiowaves.left.and.right' : 'circle.dashed'}
         size={16}
@@ -373,7 +381,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   aboutRow: {
     flexDirection: 'row',

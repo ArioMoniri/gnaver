@@ -1,6 +1,11 @@
 /**
- * Screen scaffold: safe-area padding, app background, and an optional NavBar with
- * a back affordance, title/subtitle, and a single right action slot.
+ * Screen scaffold: safe-area padding, app background, and an optional glass
+ * NavBar with a back affordance, title/subtitle, and a single right action slot.
+ *
+ * The NavBar is a thin Liquid Glass bar that floats over the content beneath it,
+ * with circular glass control buttons — first-party iOS chrome. When `floatingNav`
+ * is set the bar overlaps the content (used over maps / hero washes); otherwise it
+ * sits in the normal flow above a plain background.
  */
 import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -10,6 +15,7 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 import { IconSymbol } from './IconSymbol';
+import { GlassSurface } from './GlassCard';
 import { hapticSelection } from './haptics';
 
 export interface NavBarAction {
@@ -35,6 +41,39 @@ export interface ScreenProps {
   style?: StyleProp<ViewStyle>;
 }
 
+const NAV_BTN = 38;
+
+function NavButton({
+  icon,
+  iconFallback,
+  onPress,
+  accessibilityLabel,
+}: {
+  icon: SFSymbol;
+  iconFallback?: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={10}
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
+    >
+      <GlassSurface variant="chip" interactive radius="pill" padding="none" sheen={false} style={styles.navBtnShadow}>
+        <View style={styles.navBtn}>
+          <IconSymbol name={icon} size={18} color={theme.colors.onGlass} weight="semibold" fallbackGlyph={iconFallback} />
+        </View>
+      </GlassSurface>
+    </Pressable>
+  );
+}
+
 export function Screen({
   children,
   title,
@@ -52,33 +91,17 @@ export function Screen({
 
   return (
     <View
-      style={[
-        styles.root,
-        { backgroundColor: background ?? theme.colors.background, paddingTop: insets.top },
-        style,
-      ]}
+      style={[styles.root, { backgroundColor: background ?? theme.colors.background, paddingTop: insets.top }, style]}
     >
       {showNav ? (
         <View style={[styles.nav, { paddingHorizontal: theme.spacing.md }]}>
           <View style={styles.navSide}>
             {onBack ? (
-              <Pressable
-                accessibilityRole="button"
+              <NavButton
+                icon={backVariant === 'close' ? 'xmark' : 'chevron.left'}
+                onPress={onBack}
                 accessibilityLabel={backVariant === 'close' ? 'Close' : 'Back'}
-                hitSlop={10}
-                onPress={() => {
-                  hapticSelection();
-                  onBack();
-                }}
-                style={[styles.navBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-              >
-                <IconSymbol
-                  name={backVariant === 'close' ? 'xmark' : 'chevron.left'}
-                  size={18}
-                  color={theme.colors.text}
-                  weight="semibold"
-                />
-              </Pressable>
+              />
             ) : null}
           </View>
 
@@ -97,24 +120,12 @@ export function Screen({
 
           <View style={[styles.navSide, styles.navSideEnd]}>
             {rightAction ? (
-              <Pressable
-                accessibilityRole="button"
+              <NavButton
+                icon={rightAction.icon}
+                iconFallback={rightAction.iconFallback}
+                onPress={rightAction.onPress}
                 accessibilityLabel={rightAction.accessibilityLabel}
-                hitSlop={10}
-                onPress={() => {
-                  hapticSelection();
-                  rightAction.onPress();
-                }}
-                style={[styles.navBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-              >
-                <IconSymbol
-                  name={rightAction.icon}
-                  size={18}
-                  color={theme.colors.text}
-                  weight="semibold"
-                  fallbackGlyph={rightAction.iconFallback}
-                />
-              </Pressable>
+              />
             ) : null}
           </View>
         </View>
@@ -124,8 +135,6 @@ export function Screen({
     </View>
   );
 }
-
-const NAV_BTN = 38;
 
 const styles = StyleSheet.create({
   root: {
@@ -148,13 +157,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  navBtnShadow: {
+    borderRadius: NAV_BTN / 2,
+  },
   navBtn: {
     width: NAV_BTN,
     height: NAV_BTN,
-    borderRadius: NAV_BTN / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   body: {
     flex: 1,

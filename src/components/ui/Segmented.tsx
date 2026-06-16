@@ -1,6 +1,10 @@
 /**
- * Generic segmented control with a sliding selection pill. Typed over the option
+ * Generic segmented control with a sliding selection thumb. Typed over the option
  * value so call-sites stay type-safe (e.g. TransportMode, Pace, a string union).
+ *
+ * The track is a quiet recessed surface; the thumb is the brand gradient with a
+ * specular top edge, sliding on a spring. Over the map, pass `overMap` to render
+ * the track as real Liquid Glass.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import {
@@ -9,12 +13,15 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type ColorValue,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/theme';
 import { Text } from './Text';
+import { GlassSurface } from './GlassCard';
 import { hapticSelection } from './haptics';
 
 export interface SegmentOption<T extends string> {
@@ -26,10 +33,12 @@ export interface SegmentedProps<T extends string> {
   options: SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Render the track as Liquid Glass (for controls floating over the map). */
+  overMap?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Segmented<T extends string>({ options, value, onChange, style }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ options, value, onChange, overMap = false, style }: SegmentedProps<T>) {
   const theme = useTheme();
   const widthRef = useRef(0);
   const translate = useRef(new Animated.Value(0)).current;
@@ -71,35 +80,37 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
     [index, moveTo],
   );
 
-  return (
-    <View
-      onLayout={onLayout}
-      style={[
-        styles.track,
-        {
-          backgroundColor: theme.colors.background,
-          borderRadius: theme.radius.md,
-          padding: 3,
-          borderColor: theme.colors.border,
-        },
-        style,
-      ]}
-    >
+  const segments = (
+    <>
       <Animated.View
         pointerEvents="none"
         style={[
           styles.thumb,
           {
             width: `${100 / count}%`,
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radius.md - 3,
+            borderRadius: theme.radius.md - 1,
             transform: [{ translateX: translate }],
           },
           theme.elevation.card,
         ]}
-      />
+      >
+        <LinearGradient
+          colors={theme.gradients.brand as unknown as readonly [ColorValue, ColorValue, ColorValue]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: theme.radius.md - 1, overflow: 'hidden' }]}
+        >
+          <View style={[styles.specular, { backgroundColor: theme.colors.glassStroke }]} />
+        </LinearGradient>
+      </Animated.View>
+
       {options.map((opt) => {
         const active = opt.value === value;
+        const labelColor = active
+          ? theme.colors.onAccent
+          : overMap
+            ? theme.colors.onGlassSecondary
+            : theme.colors.textSecondary;
         return (
           <Pressable
             key={opt.value}
@@ -113,17 +124,40 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
             }}
             style={styles.segment}
           >
-            <Text
-              variant="subhead"
-              weight={active ? '600' : '500'}
-              style={{ color: active ? theme.colors.text : theme.colors.textSecondary }}
-              numberOfLines={1}
-            >
+            <Text variant="subhead" weight={active ? '700' : '500'} style={{ color: labelColor }} numberOfLines={1}>
               {opt.label}
             </Text>
           </Pressable>
         );
       })}
+    </>
+  );
+
+  if (overMap) {
+    return (
+      <GlassSurface variant="bar" radius="md" padding="none" sheen={false} style={[{ borderRadius: theme.radius.md }, style]}>
+        <View onLayout={onLayout} style={[styles.inner, { padding: 4 }]}>
+          {segments}
+        </View>
+      </GlassSurface>
+    );
+  }
+
+  return (
+    <View
+      onLayout={onLayout}
+      style={[
+        styles.track,
+        {
+          backgroundColor: theme.colors.background,
+          borderRadius: theme.radius.md,
+          padding: 4,
+          borderColor: theme.colors.border,
+        },
+        style,
+      ]}
+    >
+      {segments}
     </View>
   );
 }
@@ -134,11 +168,16 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     position: 'relative',
   },
+  inner: {
+    flexDirection: 'row',
+    position: 'relative',
+  },
   thumb: {
     position: 'absolute',
-    top: 3,
-    bottom: 3,
-    left: 3,
+    top: 4,
+    bottom: 4,
+    left: 4,
+    overflow: 'hidden',
   },
   segment: {
     flex: 1,
@@ -146,5 +185,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 9,
     zIndex: 1,
+  },
+  specular: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth * 2,
+    opacity: 0.6,
   },
 });
