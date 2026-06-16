@@ -103,7 +103,7 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
         } else {
           setGeocodeHints((prev) => ({
             ...prev,
-            [key]: 'Add a Google key to search addresses',
+            [key]: "Couldn't find that address — add the city name.",
           }));
           hapticNotify(NotificationFeedbackType.Warning);
         }

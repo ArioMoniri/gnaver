@@ -364,7 +364,7 @@ export default function SettingsScreen() {
 
         {/* Data sources */}
         <Section title="Data sources" subtitle={describeProviders()} theme={theme}>
-          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Live" offLabel="Connect a key" first theme={theme} />
+          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Google · live" offLabel="OpenStreetMap · free" first theme={theme} />
           <FeatureRow label="Weather" live liveLabel="Live" offLabel="Connect a key" theme={theme} />
           <FeatureRow label="Taste recommender" live={features.liveTaste} liveLabel="Live" offLabel="Connect a key" theme={theme} />
         </Section>
