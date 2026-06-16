@@ -7,6 +7,7 @@ Pure PIL, supersampled 4x for clean edges. Re-runnable:
     python3 scripts/gen_icons.py
 Outputs into assets/images/.
 """
+import json
 import math
 import os
 from PIL import Image, ImageDraw, ImageFilter
@@ -135,6 +136,50 @@ def build(mode):
     return out.resize((1024, 1024), Image.LANCZOS)
 
 
+def icon_mark(S):
+    """A bold, vertically-centred white glossy pin on transparent — the
+    foreground layer for the Apple Icon Composer (.icon) bundle. The system
+    supplies the Liquid Glass material, specular highlight and dynamic tinting."""
+    cx = S // 2
+    r = int(S * 0.225)
+    # Centre the whole teardrop (head + tip) in the canvas.
+    cy = int(S * 0.5 - 0.36 * r)
+    tip_y = cy + int(r * 1.72)
+    mask = teardrop_mask(S, cx, cy, r, tip_y)
+    pin = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    pin.paste(vgrad(S, (255, 255, 255), (226, 239, 255)).convert("RGBA"), (0, 0), mask)
+    # specular highlight on the upper-left of the head
+    hi = soft_circle(S, cx - int(r * 0.32), cy - int(r * 0.4), int(r * 0.5), (255, 255, 255, 130), S // 60)
+    clip = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    clip.paste(hi, (0, 0), mask)
+    pin = Image.alpha_composite(pin, clip)
+    # glossy blue lens
+    hr = int(r * 0.40)
+    ImageDraw.Draw(pin).ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill=(10, 108, 228, 255))
+    return pin
+
+
+def write_icon_composer_bundle():
+    """Emit assets/Gnaver.icon — the Apple Icon Composer layered format (iOS 26
+    Liquid Glass). Openable & tweakable in Icon Composer.app."""
+    icon = os.path.normpath(os.path.join(OUT, "..", "Gnaver.icon"))
+    os.makedirs(os.path.join(icon, "Assets"), exist_ok=True)
+    icon_mark(1024).save(os.path.join(icon, "Assets", "mark.png"))
+    spec = {
+        "fill": {"automatic-gradient": "extended-srgb:0.03922,0.51765,1.00000,1.00000"},
+        "groups": [
+            {
+                "layers": [{"image-name": "mark.png", "name": "Pin"}],
+                "shadow": {"kind": "neutral", "opacity": 0.45},
+                "translucency": {"enabled": False, "value": 0.5},
+            }
+        ],
+        "supported-platforms": {"circles": ["watchOS"], "squares": "shared"},
+    }
+    with open(os.path.join(icon, "icon.json"), "w") as f:
+        json.dump(spec, f, indent=2)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     app = build("app").convert("RGB")  # App Store icon: opaque, no alpha
@@ -150,7 +195,10 @@ def main():
     glyph.save(os.path.join(OUT, "splash-icon.png"))
 
     Image.new("RGB", (1024, 1024), "#FFFFFF").save(os.path.join(OUT, "android-icon-background.png"))
-    print("Wrote icon.png, favicon.png, android-icon-foreground.png, splash-icon.png, android-icon-background.png")
+
+    write_icon_composer_bundle()
+    print("Wrote icon.png, favicon.png, android-icon-foreground.png, splash-icon.png,")
+    print("android-icon-background.png, and assets/Gnaver.icon (Apple Icon Composer)")
 
 
 if __name__ == "__main__":

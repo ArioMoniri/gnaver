@@ -20,7 +20,9 @@ const config: ExpoConfig = {
   scheme: 'gnaver',
   userInterfaceStyle: 'automatic',
   ios: {
-    icon: './assets/expo.icon',
+    // Apple Icon Composer bundle (iOS 26 Liquid Glass, layered). Editable in
+    // Icon Composer.app. Falls back to the universal icon on older iOS.
+    icon: './assets/Gnaver.icon',
     supportsTablet: true,
     bundleIdentifier: 'com.ariomoniri.gnaver',
     infoPlist: {
