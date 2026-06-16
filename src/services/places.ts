@@ -33,6 +33,13 @@ import {
 } from '@/core';
 import { findCity, listCities, cityIdForCenter, getCityPlaces, getCityFood, getSampleSharedList } from '@/data';
 import { serviceConfig, features } from './config';
+import {
+  osmResolveCity,
+  osmAutocompleteCities,
+  osmGeocodeAddress,
+  osmSearchPlaces,
+  osmSuggestFood,
+} from './osm';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -327,9 +334,12 @@ async function expandShortLink(url: string): Promise<string> {
 const GOOGLE_PLACES_BASE = 'https://maps.googleapis.com/maps/api';
 
 export const placesProvider: PlacesProvider = {
-  name: features.livePlaces ? 'google' : 'mock',
+  get name() {
+    return features.livePlaces ? 'google' : 'openstreetmap';
+  },
 
   // ── resolveCity ─────────────────────────────────────────────────────────
+  // Tiers: Google (best, keyed) → OpenStreetMap (free, any city) → curated.
   async resolveCity(query: string): Promise<ResolvedCity | null> {
     if (features.livePlaces) {
       try {
@@ -340,10 +350,10 @@ export const placesProvider: PlacesProvider = {
           return geocodingToCity(data.results[0]);
         }
       } catch {
-        // fall through to mock
+        // fall through to OSM
       }
     }
-    return findCity(query) ?? null;
+    return (await osmResolveCity(query)) ?? findCity(query) ?? null;
   },
 
   // ── autocompleteCities (type-ahead dropdown) ─────────────────────────────
@@ -363,10 +373,13 @@ export const placesProvider: PlacesProvider = {
           return data.predictions.slice(0, 6).map((p) => ({ label: p.description, id: p.place_id }));
         }
       } catch {
-        // fall through to curated
+        // fall through to OSM / curated
       }
     }
-    // Offline: curated cities matching the query (name or country).
+    // Keyless: real cities from OpenStreetMap (Open-Meteo geocoding).
+    const osm = await osmAutocompleteCities(q);
+    if (osm.length > 0) return osm;
+    // Last resort: curated cities matching the query (name or country).
     const lower = q.toLowerCase();
     return listCities()
       .filter((c) => c.name.toLowerCase().includes(lower) || c.country.toLowerCase().includes(lower))
@@ -390,10 +403,11 @@ export const placesProvider: PlacesProvider = {
           };
         }
       } catch {
-        // no offline geocoding for arbitrary addresses
+        // fall through to OSM
       }
     }
-    return null;
+    // Keyless: free-form address / hotel geocoding via Nominatim (OSM).
+    return osmGeocodeAddress(q);
   },
 
   // ── search ──────────────────────────────────────────────────────────────
@@ -414,9 +428,17 @@ export const placesProvider: PlacesProvider = {
           return data.results.slice(0, limit).map((r) => googleResultToPlace(r, false, params.currency));
         }
       } catch {
-        // fall through to mock
+        // fall through to OSM / mock
       }
     }
+    // Keyless: real POIs from OpenStreetMap (Overpass) around the center.
+    const osm = await osmSearchPlaces(
+      params.center,
+      params.interests,
+      params.limit ?? 20,
+      params.radiusMeters,
+    );
+    if (osm.length > 0) return osm;
     // Mock: filter curated places by interest overlap
     const cityId = cityIdForCenter(params.center);
     const pool = cityId ? getCityPlaces(cityId) : [];
@@ -608,9 +630,12 @@ export const placesProvider: PlacesProvider = {
           return data.results.slice(0, limit).map((r) => googleResultToPlace(r, true, params.currency));
         }
       } catch {
-        // fall through to mock
+        // fall through to OSM / mock
       }
     }
+    // Keyless: real restaurants/cafés/bars from OpenStreetMap (Overpass).
+    const osm = await osmSuggestFood(params.near, params.cuisine, params.limit ?? 15);
+    if (osm.length > 0) return osm;
     // Mock: return curated food places ranked heuristically
     const cityId = cityIdForCenter(params.near);
     const pool = cityId ? getCityFood(cityId) : [];

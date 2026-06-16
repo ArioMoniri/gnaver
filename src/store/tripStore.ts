@@ -9,6 +9,7 @@ import { create } from 'zustand';
 
 import {
   centroid,
+  creditsForPlan,
   dateRange,
   resequenceDay,
   type CurrencyCode,
@@ -26,6 +27,7 @@ import {
   listCities,
 } from '@/data';
 import { features, generateItinerary, placesProvider } from '@/services';
+import { useCredits } from './creditsStore';
 
 export type TripSource = 'city' | 'link';
 export type TripStatus =
@@ -228,9 +230,7 @@ export const useTrip = create<TripState>()((set, get) => ({
       if (!resolved) {
         set({
           status: 'error',
-          error: features.livePlaces
-            ? `Couldn't find "${q}". Try a different spelling.`
-            : `"${q}" isn't in the offline sample set. Add a Google Maps key (.env) to search any city.`,
+          error: `Couldn't find "${q}". Check the spelling, or try the city's English name.`,
         });
         return;
       }
@@ -248,7 +248,7 @@ export const useTrip = create<TripState>()((set, get) => ({
       if (candidates.length === 0) {
         set({
           status: 'error',
-          error: `No places found for ${resolved.city}. Add a Google Maps key to search live data.`,
+          error: `No points of interest found near ${resolved.city}. Try a larger nearby city, or add a Google Maps key for richer data.`,
         });
         return;
       }
@@ -389,7 +389,22 @@ export const useTrip = create<TripState>()((set, get) => ({
         set({ status: 'error', error: 'Select at least one place first.' });
         return;
       }
+
+      // Billing: free with your own keys; on the managed (hosted) tier each plan
+      // costs credits scaled to its estimated live-API spend. Charged only after
+      // a successful generation, and never when we ran no paid APIs.
+      const managed = features.managedBilling;
+      const cost = managed ? creditsForPlan(trip) : 0;
+      if (managed && !useCredits.getState().canAfford(cost)) {
+        set({
+          status: 'error',
+          error: `This plan needs ${cost} credit${cost === 1 ? '' : 's'}. Add credits or your own API keys in Settings.`,
+        });
+        return;
+      }
+
       const itinerary = await generateItinerary(trip, { now: todayLocal() });
+      if (managed) useCredits.getState().spend(cost);
       set({ itinerary, status: 'ready', activeDay: 0 });
     } catch (e) {
       set({ status: 'error', error: e instanceof Error ? e.message : 'Could not build your plan' });

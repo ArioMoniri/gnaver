@@ -61,11 +61,26 @@ export const features = {
   get liveTaste() {
     return !!serviceConfig.llmApiKey;
   },
+  /**
+   * True when the user supplied their OWN keys on-device. Those users pay their
+   * provider directly, so managed credits are never charged to them.
+   */
+  get byoKeys() {
+    return !!(runtimeKeys.get('googleApiKey') || runtimeKeys.get('llmApiKey'));
+  },
+  /**
+   * Managed (hosted) generation — we run paid live APIs on the user's behalf, so
+   * each plan is billed in credits. True only when live keys are present from the
+   * build (env), not from the user's own on-device keys.
+   */
+  get managedBilling() {
+    return this.livePlaces && !this.byoKeys;
+  },
 };
 
 export function describeProviders(): string {
   return [
-    `Places: ${features.livePlaces ? 'Google · live' : 'connect a key'}`,
+    `Places: ${features.livePlaces ? 'Google · live' : 'OpenStreetMap · free'}`,
     `Weather: Open-Meteo · live`,
     `Taste: ${features.liveTaste ? `${serviceConfig.llmProvider} · live` : 'connect a key'}`,
   ].join('   ');

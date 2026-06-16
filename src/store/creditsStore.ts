@@ -1,7 +1,9 @@
 /**
  * Pay-as-you-go credit balance (on-device, persisted). The model:
  *   - Bring your own API keys  → unlimited, free (you pay your own provider costs)
- *   - Or spend CREDITS         → we run the AI for you (hosted), 1 credit / plan
+ *   - Or spend CREDITS         → we run the AI for you (hosted). Each plan is
+ *     billed at its estimated live-API cost via `creditsForPlan(trip)` in
+ *     `@/core` (min `CREDITS_PER_PLAN`), so big trips cost more than small ones.
  *
  * Credits are bought as consumable in-app purchases (credit packs). The purchase
  * itself needs App Store Connect consumable products + a hosted AI backend to
@@ -11,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-/** Credits spent to generate one hosted-AI plan. */
+/** Minimum credits charged for any single managed plan (cost-scaled above this). */
 export const CREDITS_PER_PLAN = 1;
 
 /** Consumable credit packs offered on the paywall (id must match an ASC product). */
@@ -42,8 +44,8 @@ export interface CreditsState {
 export const useCredits = create<CreditsState>()(
   persist(
     (set, get) => ({
-      // A few credits so a new user can try hosted plans before buying.
-      balance: 3,
+      // Enough credits so a new user can build a full plan or two before buying.
+      balance: 5,
       hasHydrated: false,
       add: (n) => set({ balance: Math.max(0, get().balance + n) }),
       spend: (n) => {

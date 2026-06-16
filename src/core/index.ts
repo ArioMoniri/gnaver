@@ -12,3 +12,4 @@ export * from './googleMaps';
 export * from './googleList';
 export * from './recommender';
 export * from './optimizer';
+export * from './cost';

@@ -117,8 +117,8 @@ export default function PaywallScreen() {
         {/* ── Model explainer ───────────────────────────────────────────────── */}
         <GlassCard padding="lg" radius="xl">
           <Text variant="subhead" tone="secondary" align="center">
-            Bring your own API keys — free, unlimited. Or buy credits and we run the AI for you
-            {` (${CREDITS_PER_PLAN} credit = 1 optimized plan).`}
+            Bring your own API keys — free, unlimited. Or buy credits and we run the AI for you —
+            each plan costs about {CREDITS_PER_PLAN}–8 credits, scaled to the live data it uses.
           </Text>
         </GlassCard>
 
