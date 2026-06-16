@@ -8,7 +8,9 @@
  */
 
 import type {
+  CitySuggestion,
   FoodSearchParams,
+  GeocodedPoint,
   Interest,
   LatLng,
   ParsedList,
@@ -27,7 +29,7 @@ import {
   parsePlaceNameFromUrl,
   rankFoodHeuristic,
 } from '@/core';
-import { findCity, cityIdForCenter, getCityPlaces, getCityFood, getSampleSharedList } from '@/data';
+import { findCity, listCities, cityIdForCenter, getCityPlaces, getCityFood, getSampleSharedList } from '@/data';
 import { serviceConfig, features } from './config';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,6 +243,7 @@ function googleResultToPlace(r: GooglePlaceResult, isFood = false, currency = 'U
 interface GeocodingResult {
   address_components: Array<{ long_name: string; short_name: string; types: string[] }>;
   geometry: { location: { lat: number; lng: number } };
+  formatted_address?: string;
   place_id: string;
 }
 
@@ -307,6 +310,56 @@ export const placesProvider: PlacesProvider = {
       }
     }
     return findCity(query) ?? null;
+  },
+
+  // ── autocompleteCities (type-ahead dropdown) ─────────────────────────────
+  async autocompleteCities(query: string): Promise<CitySuggestion[]> {
+    const q = query.trim();
+    if (q.length < 2) return [];
+    if (features.livePlaces) {
+      try {
+        const url =
+          `${GOOGLE_PLACES_BASE}/place/autocomplete/json?input=${encodeURIComponent(q)}` +
+          `&types=(cities)&key=${serviceConfig.googleApiKey}`;
+        const data = await gFetch<{
+          status: string;
+          predictions: Array<{ description: string; place_id: string }>;
+        }>(url);
+        if (data.status === 'OK') {
+          return data.predictions.slice(0, 6).map((p) => ({ label: p.description, id: p.place_id }));
+        }
+      } catch {
+        // fall through to curated
+      }
+    }
+    // Offline: curated cities matching the query (name or country).
+    const lower = q.toLowerCase();
+    return listCities()
+      .filter((c) => c.name.toLowerCase().includes(lower) || c.country.toLowerCase().includes(lower))
+      .slice(0, 6)
+      .map((c) => ({ label: `${c.name}, ${c.country}`, id: c.id }));
+  },
+
+  // ── geocodeAddress (hotel / start-end point) ─────────────────────────────
+  async geocodeAddress(query: string): Promise<GeocodedPoint | null> {
+    const q = query.trim();
+    if (!q) return null;
+    if (features.livePlaces) {
+      try {
+        const url = `${GOOGLE_PLACES_BASE}/geocode/json?address=${encodeURIComponent(q)}&key=${serviceConfig.googleApiKey}`;
+        const data = await gFetch<GeocodingResponse>(url);
+        if (data.status === 'OK' && data.results.length > 0) {
+          const r = data.results[0];
+          return {
+            location: { lat: r.geometry.location.lat, lng: r.geometry.location.lng },
+            label: r.formatted_address ?? q,
+          };
+        }
+      } catch {
+        // no offline geocoding for arbitrary addresses
+      }
+    }
+    return null;
   },
 
   // ── search ──────────────────────────────────────────────────────────────

@@ -259,7 +259,10 @@ export interface ScheduledStop {
   legToHere?: RouteLeg;
   /** Minutes spent waiting for the place to open before entering. */
   waitMinutes?: number;
+  /** Hard issues (closed soon, weather exposure). */
   warnings?: string[];
+  /** Friendly, actionable advice — "Dress modestly", "Take an umbrella". */
+  tips?: string[];
   isFood?: boolean;
 }
 
@@ -278,6 +281,8 @@ export interface DayPlan {
   /** Google Maps directions deep link for the whole day. */
   googleMapsUrl: string;
   warnings?: string[];
+  /** Friendly day-level advice — "Take an umbrella", "Stay hydrated". */
+  tips?: string[];
 }
 
 export interface ItineraryResult {
@@ -335,9 +340,25 @@ export interface ParsedList {
   fromSample?: boolean;
 }
 
+export interface CitySuggestion {
+  /** Display label, e.g. "Porto, Portugal". */
+  label: string;
+  /** Provider place id (Google), when available. */
+  id?: string;
+}
+
+export interface GeocodedPoint {
+  location: LatLng;
+  label: string;
+}
+
 export interface PlacesProvider {
   readonly name: string;
   resolveCity(query: string): Promise<ResolvedCity | null>;
+  /** Type-ahead city suggestions (live Places Autocomplete; offline = curated matches). */
+  autocompleteCities(query: string): Promise<CitySuggestion[]>;
+  /** Geocode a free-form address / hotel name to a point (live only; null offline). */
+  geocodeAddress(query: string): Promise<GeocodedPoint | null>;
   search(params: PlaceSearchParams): Promise<Place[]>;
   details(googlePlaceId: string): Promise<Partial<Place> | null>;
   /** Resolve a shared Google Maps list / saved-places link into Places. */

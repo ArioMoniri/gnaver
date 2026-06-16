@@ -13,7 +13,7 @@
  * routing data in the app, haversine estimate in tests / offline).
  */
 
-import { evaluateVisit, openRangesForDate, weatherImpact } from './constraints';
+import { dayTips, evaluateVisit, openRangesForDate, placeTips, weatherImpact } from './constraints';
 import { estimateLeg } from './geo';
 import { buildDirectionsUrl } from './googleMaps';
 import { sumEntryCost } from './currency';
@@ -118,6 +118,7 @@ interface BuiltStop {
   waitMinutes: number;
   leg: RouteLeg;
   warnings: string[];
+  tips: string[];
   isFood: boolean;
   adjValue: number;
 }
@@ -192,6 +193,7 @@ function tryStop(
     waitMinutes: vis.waitMinutes,
     leg,
     warnings,
+    tips: placeTips(place),
     isFood,
     adjValue: baseValue(place, ctx.prefs) * wx.multiplier,
   };
@@ -370,6 +372,7 @@ function toScheduledStop(b: BuiltStop): ScheduledStop {
     legToHere: b.leg.distanceMeters === 0 && b.leg.durationMinutes === 0 ? undefined : b.leg,
     waitMinutes: b.waitMinutes || undefined,
     warnings: b.warnings.length ? b.warnings : undefined,
+    tips: b.tips.length ? b.tips : undefined,
     isFood: b.isFood || undefined,
   };
 }
@@ -403,6 +406,10 @@ function assembleDay(builtStops: BuiltStop[], ctx: DayContext, trip: Trip): DayP
     weather: ctx.weather,
     googleMapsUrl: buildDirectionsUrl(points, trip.preferences.transport),
     warnings: dayWarnings.length ? dayWarnings : undefined,
+    tips: (() => {
+      const t = dayTips(ctx.weather);
+      return t.length ? t : undefined;
+    })(),
   };
 }
 
@@ -415,15 +422,14 @@ export function optimizeItinerary(input: OptimizeInput): ItineraryResult {
   const travel = input.travel ?? estimateLeg;
   const pool = trip.places.filter((p) => !p.isFood);
   const remaining = new Map(pool.map((p) => [p.id, p]));
-  const days: DayPlan[] = [];
-  let totalScore = 0;
 
+  // Pass 1 — greedily build each day, then 2-opt polish.
+  const built: { ctx: DayContext; stops: BuiltStop[] }[] = [];
   for (const window of trip.days) {
     let startMinutes = window.startMinutes;
     if (input.now && input.now.date === window.date) {
       startMinutes = Math.max(startMinutes, input.now.minutes);
     }
-
     const ctx: DayContext = {
       window,
       weather: input.weatherByDate?.[window.date],
@@ -432,17 +438,33 @@ export function optimizeItinerary(input: OptimizeInput): ItineraryResult {
       travel,
       startMinutes,
     };
-
     const { stops } = buildDay([...remaining.values()], ctx);
     const polished = twoOpt(stops, ctx);
-
-    for (const b of polished) {
-      if (!b.isFood) remaining.delete(b.place.id);
-      totalScore += b.adjValue;
-    }
-
-    days.push(assembleDay(polished, ctx, trip));
+    for (const b of polished) if (!b.isFood) remaining.delete(b.place.id);
+    built.push({ ctx, stops: polished });
   }
+
+  // Pass 2 — refit: try to slot every still-unscheduled place into another day
+  // or another time-slot (any feasible position on any day), highest value first.
+  const leftovers = [...remaining.values()].sort(
+    (a, b) => baseValue(b, trip.preferences) - baseValue(a, trip.preferences),
+  );
+  for (const place of leftovers) {
+    for (const day of built) {
+      const inserted = tryInsert(day.stops, place, day.ctx);
+      if (inserted) {
+        day.stops = inserted;
+        remaining.delete(place.id);
+        break;
+      }
+    }
+  }
+
+  let totalScore = 0;
+  const days: DayPlan[] = built.map((d) => {
+    for (const b of d.stops) totalScore += b.adjValue;
+    return assembleDay(d.stops, d.ctx, trip);
+  });
 
   return {
     trip,
@@ -451,6 +473,21 @@ export function optimizeItinerary(input: OptimizeInput): ItineraryResult {
     generatedAt: new Date().toISOString(),
     score: Math.round(totalScore),
   };
+}
+
+/**
+ * Try to insert `place` into an existing day at any position without breaking
+ * feasibility (opening hours, day window) for it or the stops it shifts. Returns
+ * the new stop list on success, else null. Powers the cross-day refit pass.
+ */
+function tryInsert(stops: BuiltStop[], place: Place, ctx: DayContext): BuiltStop[] | null {
+  const order = stops.map((s) => s.place);
+  for (let pos = 0; pos <= order.length; pos++) {
+    const candidate = [...order.slice(0, pos), place, ...order.slice(pos)];
+    const sim = simulate(candidate, ctx);
+    if (sim) return sim;
+  }
+  return null;
 }
 
 /**
@@ -508,6 +545,7 @@ export function resequenceDay(
       legToHere: leg.distanceMeters === 0 && leg.durationMinutes === 0 ? undefined : leg,
       waitMinutes: wait || undefined,
       warnings: warnings.length ? warnings : undefined,
+      tips: placeTips(place).length ? placeTips(place) : undefined,
       isFood: place.isFood || undefined,
     });
     pos = place.location;
@@ -531,5 +569,6 @@ export function resequenceDay(
     unscheduled: [],
     weather: opts?.weather,
     googleMapsUrl: buildDirectionsUrl(points, prefs.transport),
+    tips: dayTips(opts?.weather).length ? dayTips(opts?.weather) : undefined,
   };
 }

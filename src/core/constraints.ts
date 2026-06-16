@@ -191,3 +191,26 @@ export function weatherImpact(
 
   return { multiplier: Math.max(0.2, multiplier), warnings };
 }
+
+/** Place-specific, actionable advice (dress code, what to bring). */
+export function placeTips(place: Place): string[] {
+  const tips: string[] = [];
+  if (place.category === 'religious' || place.interests.includes('religion')) {
+    tips.push('Dress modestly — cover shoulders & knees');
+  }
+  if (place.category === 'beach') tips.push('Bring swimwear, a towel & sun cream');
+  if (place.category === 'viewpoint') tips.push('Best light near sunrise/sunset for photos');
+  return tips;
+}
+
+/** Day-level advice driven by the forecast — "Take an umbrella", etc. */
+export function dayTips(weather: DayWeather | undefined): string[] {
+  const tips: string[] = [];
+  if (!weather) return tips;
+  if (BAD_CONDITIONS.has(weather.condition) || weather.precipitationProbability >= 50) {
+    tips.push('Take an umbrella ☔ — rain likely today');
+  }
+  if (weather.tempMaxC >= 30) tips.push('Stay hydrated & wear sun protection ☀️');
+  if (weather.tempMinC <= 4) tips.push('Bundle up — it will be cold today 🧥');
+  return tips;
+}
