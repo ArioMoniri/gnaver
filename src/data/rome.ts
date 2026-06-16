@@ -367,6 +367,7 @@ export const romeFood: Place[] = [
     tags: ['trattoria', 'Roman cuisine', 'cacio e pepe', 'Trastevere'],
     isFood: true,
     mustSee: true,
+    dishes: ['Cacio e pepe', 'Coda alla vaccinara', 'Carciofi alla giudia'],
   },
   {
     id: 'rome-food-supplì-roma',
@@ -399,6 +400,7 @@ export const romeFood: Place[] = [
     description: 'The gold standard of Roman street food — fried rice balls with mozzarella, always a queue.',
     tags: ['supplì', 'fried rice', 'street food', 'Roman snack'],
     isFood: true,
+    dishes: ['Supplì al telefono', 'Pizza al taglio bianca', 'Fiori di zucca fritti'],
   },
   {
     id: 'rome-food-il-gelato-di-san-crispino',
@@ -431,6 +433,7 @@ export const romeFood: Place[] = [
     description: 'Rome\'s most revered artisan gelato — honey & walnut, cream of spice, no artificial colours.',
     tags: ['gelato', 'artisan', 'natural ingredients', 'near Trevi'],
     isFood: true,
+    dishes: ['Gelato miele e noci', 'Crema di spezie', 'Sorbetto al limone'],
   },
   {
     id: 'rome-food-roscioli',
@@ -462,6 +465,7 @@ export const romeFood: Place[] = [
     description: 'Historic Roman bakery near Campo de\' Fiori — legendary pizza bianca, mortadella focaccia.',
     tags: ['bakery', 'pizza al taglio', 'mortadella', 'Roman'],
     isFood: true,
+    dishes: ['Pizza bianca con mortadella', 'Focaccia con olive', 'Maritozzo con panna'],
   },
   {
     id: 'rome-food-tonnarello',
@@ -493,6 +497,7 @@ export const romeFood: Place[] = [
     description: 'No-frills neighbourhood osteria serving daily specials chalked on the board — Rome as it was.',
     tags: ['osteria', 'Roman classics', 'local', 'cheap eat'],
     isFood: true,
+    dishes: ['Amatriciana', 'Trippa alla romana', 'Abbacchio al forno'],
   },
   {
     id: 'rome-food-bar-san-calisto',
@@ -525,6 +530,7 @@ export const romeFood: Place[] = [
     description: 'Trastevere institution: cheap drinks, outdoor tables on the piazza, genuine Roman crowd.',
     tags: ['bar', 'Trastevere', 'cheap drinks', 'local', 'piazza'],
     isFood: true,
+    dishes: ['Aperol Spritz', 'Bruschetta al pomodoro', 'Tramezzino'],
   },
   {
     id: 'rome-food-baccano',
@@ -557,6 +563,7 @@ export const romeFood: Place[] = [
     description: 'All-day brasserie near the Spanish Steps — Roman plates, good wine, art deco interiors.',
     tags: ['all-day dining', 'brasserie', 'Spanish Steps', 'Art Deco'],
     isFood: true,
+    dishes: ['Carbonara', 'Saltimbocca alla romana', 'Tiramisu'],
   },
   {
     id: 'rome-food-frigidarium',
@@ -589,5 +596,6 @@ export const romeFood: Place[] = [
     description: 'Tiny gelateria with chocolate-coated waffle cones, creamy stracciatella, and pistachio to die for.',
     tags: ['gelato', 'chocolate cone', 'pistachio', 'neighbourhood'],
     isFood: true,
+    dishes: ['Cono pistacchio con cioccolato', 'Stracciatella', 'Nocciola e caffè'],
   },
 ];

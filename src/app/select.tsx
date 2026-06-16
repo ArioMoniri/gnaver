@@ -45,6 +45,7 @@ export default function SelectScreen() {
   const insets = useSafeAreaInsets();
 
   const candidates = useTrip((s) => s.candidates);
+  const importedSample = useTrip((s) => s.importedSample);
   const selectedIds = useTrip((s) => s.selectedIds);
   const currency = useTrip((s) => s.currency);
   const center = useTrip((s) => s.center);
@@ -150,6 +151,21 @@ export default function SelectScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Honest disclosure when the pasted list fell back to sample data. */}
+          {importedSample ? (
+            <View
+              style={[
+                styles.sampleBanner,
+                { backgroundColor: `${theme.colors.warning}1A`, borderColor: `${theme.colors.warning}33`, borderRadius: theme.radius.md },
+              ]}
+            >
+              <IconSymbol name="info.circle.fill" size={15} color={theme.colors.warning} fallbackGlyph="ⓘ" />
+              <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
+                We couldn&apos;t read that list directly — here&apos;s a sample you can edit.
+              </Text>
+            </View>
+          ) : null}
+
           {/* Day options entry */}
           <Pressable
             accessibilityRole="button"
@@ -290,6 +306,14 @@ export default function SelectScreen() {
 }
 
 const styles = StyleSheet.create({
+  sampleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+  },
   addRow: {
     flexDirection: 'row',
     alignItems: 'center',

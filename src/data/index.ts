@@ -127,6 +127,15 @@ export function getCityFood(cityId: string): Place[] {
 }
 
 /**
+ * Returns the list of must-try local dishes for the given city id.
+ * Returns [] for unknown city ids.
+ */
+export function getLocalDishes(cityId: string): string[] {
+  const meta = CITIES.find((c) => c.id === cityId);
+  return meta ? meta.localDishes : [];
+}
+
+/**
  * Returns a believable demo "shared list" — as if a friend exported their
  * Lisbon saved-places from Google Maps and shared the link.
  */

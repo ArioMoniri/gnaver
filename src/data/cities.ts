@@ -11,6 +11,7 @@ export interface CityMeta {
   emoji: string;
   blurb: string;
   interests: Interest[];
+  localDishes: string[];
 }
 
 export const CITIES: CityMeta[] = [
@@ -25,6 +26,7 @@ export const CITIES: CityMeta[] = [
     emoji: '🇵🇹',
     blurb: 'Sun-drenched trams, Moorish hilltop castles, pastel de nata, and fado drifting through Alfama alleyways.',
     interests: ['history', 'architecture', 'food', 'culture', 'photography'],
+    localDishes: ['Pastéis de nata', 'Bacalhau à brás', 'Bifana', 'Caldo verde', 'Grilled sardines', 'Ginjinha'],
   },
   {
     id: 'paris',
@@ -37,6 +39,7 @@ export const CITIES: CityMeta[] = [
     emoji: '🇫🇷',
     blurb: 'Iron towers, Impressionist masterpieces, flaky croissants, and boulevards built for flaneurs.',
     interests: ['art', 'culture', 'food', 'architecture', 'history'],
+    localDishes: ['Croissant au beurre', 'Steak tartare', 'Soupe à l\'oignon', 'Boeuf bourguignon', 'Tarte Tatin', 'Crêpes suzette'],
   },
   {
     id: 'rome',
@@ -49,6 +52,7 @@ export const CITIES: CityMeta[] = [
     emoji: '🇮🇹',
     blurb: '2,000 years of empire: gladiators, gelato, Bernini fountains, and the best cacio e pepe on the planet.',
     interests: ['history', 'architecture', 'food', 'religion', 'art'],
+    localDishes: ['Cacio e pepe', 'Supplì', 'Carbonara', 'Saltimbocca alla romana', 'Coda alla vaccinara', 'Maritozzo'],
   },
   {
     id: 'barcelona',
@@ -61,6 +65,7 @@ export const CITIES: CityMeta[] = [
     emoji: '🇪🇸',
     blurb: 'Gaudí\'s surreal cathedrals, tapas at midnight, golden beaches, and a city that never sleeps before 2 am.',
     interests: ['architecture', 'food', 'beach', 'nightlife', 'art'],
+    localDishes: ['Pan con tomate', 'Patatas bravas', 'Crema catalana', 'Fideuà', 'Escalivada', 'Croquetes de jamón'],
   },
   {
     id: 'tokyo',
@@ -73,6 +78,7 @@ export const CITIES: CityMeta[] = [
     emoji: '🇯🇵',
     blurb: 'Ancient shrines next to neon towers, bullet-train sushi, cherry blossoms, and the world\'s most seamless city.',
     interests: ['food', 'culture', 'architecture', 'shopping', 'history'],
+    localDishes: ['Tonkotsu ramen', 'Omakase sushi', 'Yakitori', 'Tamagoyaki', 'Monjayaki', 'Katsu curry'],
   },
   {
     id: 'amsterdam',
@@ -85,5 +91,6 @@ export const CITIES: CityMeta[] = [
     emoji: '🇳🇱',
     blurb: 'Rembrandt and Van Gogh, a thousand canal bridges, raw herring with onion, and the world\'s most cycling-friendly city.',
     interests: ['art', 'history', 'culture', 'food', 'architecture'],
+    localDishes: ['Haring met uitjes', 'Stamppot', 'Bitterballen', 'Stroopwafel', 'Erwtensoep', 'Poffertjes'],
   },
 ];

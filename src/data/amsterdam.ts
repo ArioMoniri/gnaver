@@ -386,6 +386,7 @@ export const amsterdamFood: Place[] = [
     tags: ['Dutch cuisine', 'stamppot', 'historic', 'genever', 'canal houses'],
     isFood: true,
     mustSee: true,
+    dishes: ['Stamppot met rookworst', 'Hutspot', 'Jenever met bitterballen'],
   },
   {
     id: 'amsterdam-food-stroopwafel-de-waag',
@@ -418,6 +419,7 @@ export const amsterdamFood: Place[] = [
     description: 'Grand café inside the medieval Waag tower on Nieuwmarkt — spectacular interior, Dutch brown café spirit.',
     tags: ['café', 'medieval castle', 'Nieuwmarkt', 'candles', 'Dutch'],
     isFood: true,
+    dishes: ['Appeltaart met slagroom', 'Uitsmijter', 'Bruine bonensoep'],
   },
   {
     id: 'amsterdam-food-brouwerij-de-prael',
@@ -450,6 +452,7 @@ export const amsterdamFood: Place[] = [
     description: 'Craft brewery in a windmill at the base of an old grain silo — tasting trays, bitterballen, canal views.',
     tags: ['brewery', 'craft beer', 'windmill', 'bitterballen', 'canal'],
     isFood: true,
+    dishes: ['Bitterballen met mosterd', 'Natte (wheat beer)', 'Zatte (tripel ale)'],
   },
   {
     id: 'amsterdam-food-vlaams-friteshuis',
@@ -482,6 +485,7 @@ export const amsterdamFood: Place[] = [
     description: 'Amsterdam institution since 1887 — twice-cooked Belgian fries with a wall of 25 sauces. No ketchup here.',
     tags: ['frites', 'Belgian fries', 'mayonnaise', 'street food', 'Spui'],
     isFood: true,
+    dishes: ['Patatje oorlog', 'Patatje mayo', 'Patatje speciaal'],
   },
   {
     id: 'amsterdam-food-de-kas',
@@ -513,6 +517,7 @@ export const amsterdamFood: Place[] = [
     description: 'Farm-to-table dining inside a monumental 1926 municipal greenhouse — produce picked that morning.',
     tags: ['farm-to-table', 'greenhouse', 'seasonal', 'Frankendael Park'],
     isFood: true,
+    dishes: ['Greenhouse herb salad', 'Smoked duck with seasonal roots', 'Strawberry & elderflower dessert'],
   },
   {
     id: 'amsterdam-food-winkel43',
@@ -545,6 +550,7 @@ export const amsterdamFood: Place[] = [
     description: 'Amsterdam\'s most famous apple pie — enormous slices with cream, eaten at pavement tables in Jordaan.',
     tags: ['appeltaart', 'apple pie', 'Jordaan', 'café', 'Noordermarkt'],
     isFood: true,
+    dishes: ['Appeltaart met slagroom', 'Koffie verkeerd', 'Stroopwafel'],
   },
   {
     id: 'amsterdam-food-herring-stall',
@@ -576,6 +582,7 @@ export const amsterdamFood: Place[] = [
     description: 'Classic Dutch street experience — raw herring (haring) with onion and pickles, eaten by holding the tail.',
     tags: ['haring', 'raw herring', 'Dutch street food', 'kiosk', 'traditional'],
     isFood: true,
+    dishes: ['Hollandse nieuwe haring', 'Haring op broodje', 'Gebakken haring'],
   },
   {
     id: 'amsterdam-food-sugarcrumbs',
@@ -608,5 +615,6 @@ export const amsterdamFood: Place[] = [
     description: 'Amsterdam\'s most atmospheric brown café (bruine kroeg) since 1642 — Delft tiles, candles, Dutch apple pie.',
     tags: ['bruine kroeg', 'brown café', 'Jordaan', 'appeltaart', '1642'],
     isFood: true,
+    dishes: ['Appeltaart huisgemaak', 'Jenever jonge', 'Kaasplankje'],
   },
 ];

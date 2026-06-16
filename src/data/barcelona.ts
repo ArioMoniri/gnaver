@@ -389,6 +389,7 @@ export const barcelonaFood: Place[] = [
     tags: ['Albert Adrià', 'avant-garde tapas', 'molecular', 'Eixample', 'top table'],
     isFood: true,
     mustSee: true,
+    dishes: ['Aceitunas esféricas', 'Cono de jamón ibérico', 'Buñuelo de bacalao'],
   },
   {
     id: 'barcelona-food-bar-mut',
@@ -421,6 +422,7 @@ export const barcelonaFood: Place[] = [
     description: 'Belle Époque Eixample bar beloved for seafood tapas, house vermouth, and tinned seafood.',
     tags: ['vermouth', 'tapas', 'Eixample', 'Belle Époque', 'tinned seafood'],
     isFood: true,
+    dishes: ['Vermut de la casa con anchoas', 'Gamba roja a la plancha', 'Navaja en lata'],
   },
   {
     id: 'barcelona-food-quimet-quimet',
@@ -452,6 +454,7 @@ export const barcelonaFood: Place[] = [
     description: 'Standing-room bodega stacked to the ceiling — extraordinary montaditos and house tinned seafood.',
     tags: ['bodega', 'montaditos', 'tinned seafood', 'Poble Sec', 'local'],
     isFood: true,
+    dishes: ['Montadito de anchoa y pimiento', 'Mejillones en escabeche', 'Berberechos al natural'],
   },
   {
     id: 'barcelona-food-escriba',
@@ -484,6 +487,7 @@ export const barcelonaFood: Place[] = [
     description: 'Modernista gem on Las Ramblas — stained glass façade, artisan croissants, sculptural chocolate creations.',
     tags: ['pastisseria', 'Modernista', 'chocolate', 'croissants', 'Las Ramblas'],
     isFood: true,
+    dishes: ['Croissant de mantequilla', 'Mona de Pascua', 'Escudella i carn d\'olla'],
   },
   {
     id: 'barcelona-food-bar-celta-pulperia',
@@ -516,6 +520,7 @@ export const barcelonaFood: Place[] = [
     description: 'Galician pulpería in the Gothic Quarter — smoky octopus, empanadas, Albariño — straightforward and excellent.',
     tags: ['Galician', 'pulpo', 'octopus', 'tapas', 'Gothic Quarter'],
     isFood: true,
+    dishes: ['Pulpo á feira', 'Empanada gallega', 'Pimientos de Padrón'],
   },
   {
     id: 'barcelona-food-el-nacional',
@@ -548,6 +553,7 @@ export const barcelonaFood: Place[] = [
     description: 'Spectacular 1930s building with four distinct dining spaces — Catalan, seafood, pintxos, and cocktail bar.',
     tags: ['food hall', 'Art Deco', 'Catalan cuisine', 'pintxos', 'Passeig de Gràcia'],
     isFood: true,
+    dishes: ['Fideuà negre', 'Pintxo de txangurro', 'Crema catalana'],
   },
   {
     id: 'barcelona-food-granja-viader',
@@ -579,6 +585,7 @@ export const barcelonaFood: Place[] = [
     description: 'Barcelona\'s oldest milk bar (since 1870) — thick hot chocolate, mel i mató, and old marble tables.',
     tags: ['historic café', 'hot chocolate', 'churros', 'Raval', '1870'],
     isFood: true,
+    dishes: ['Xocolata amb churros', 'Mel i mató', 'Suís de nata'],
   },
   {
     id: 'barcelona-food-bar-electricitat',
@@ -611,5 +618,6 @@ export const barcelonaFood: Place[] = [
     description: 'Classic Barceloneta vermouth bar with 1950s tiles, barrel wine, and no-nonsense anchovies on toast.',
     tags: ['vermouth', 'anchovies', 'Barceloneta', 'classic bar', 'tiles'],
     isFood: true,
+    dishes: ['Vermut amb anxoves', 'Pa amb tomàquet', 'Patatas bravas'],
   },
 ];

@@ -24,10 +24,21 @@ export interface TripMapStop {
   isFood?: boolean;
 }
 
+/** A labelled day endpoint (where the day starts or ends). */
+export interface TripMapPin {
+  lat: number;
+  lng: number;
+  label: string;
+}
+
 export interface TripMapProps {
   stops: TripMapStop[];
   /** Map centre fallback when there are no stops (e.g. the city centre). */
   center?: LatLng;
+  /** Where the day begins — rendered as a distinct accent pin. */
+  startPin?: TripMapPin;
+  /** Where the day ends — rendered as a distinct graphite pin. */
+  endPin?: TripMapPin;
   /** Bump this to re-fit / animate the camera (e.g. the active day index). */
   fitKey?: string | number;
   style?: StyleProp<ViewStyle>;
@@ -56,12 +67,25 @@ function cameraFor(points: LatLng[], fallback?: LatLng): { coordinates: { latitu
   return { coordinates: { latitude: centerLat, longitude: centerLng }, zoom };
 }
 
-export function TripMap({ stops, center, fitKey, style }: TripMapProps) {
+const finitePin = (p: TripMapPin | undefined): p is TripMapPin =>
+  !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+
+export function TripMap({ stops, center, startPin, endPin, fitKey, style }: TripMapProps) {
   const theme = useTheme();
 
   const valid = useMemo(() => stops.filter((s) => isFinitePoint(s.location)), [stops]);
+  const start = useMemo(() => (finitePin(startPin) ? startPin : undefined), [startPin]);
+  const end = useMemo(() => (finitePin(endPin) ? endPin : undefined), [endPin]);
+
   const points = useMemo(() => valid.map((s) => s.location), [valid]);
-  const camera = useMemo(() => cameraFor(points, center), [points, center]);
+  // Fit the camera around the route *and* the day's start/end points.
+  const fitPoints = useMemo(() => {
+    const extra: LatLng[] = [];
+    if (start) extra.push({ lat: start.lat, lng: start.lng });
+    if (end) extra.push({ lat: end.lat, lng: end.lng });
+    return [...points, ...extra];
+  }, [points, start, end]);
+  const camera = useMemo(() => cameraFor(fitPoints, center), [fitPoints, center]);
 
   const routeCoords = useMemo(
     () => points.map((p) => ({ latitude: p.lat, longitude: p.lng })),
@@ -73,12 +97,16 @@ export function TripMap({ stops, center, fitKey, style }: TripMapProps) {
     return (
       <AppleMapsView
         valid={valid}
+        startPin={start}
+        endPin={end}
         routeCoords={routeCoords}
         camera={camera}
         fitKey={fitKey}
         routeColor={theme.colors.route}
         pinColor={theme.colors.pin}
         foodColor={theme.colors.pinFood}
+        startColor={theme.colors.accent}
+        endColor={theme.colors.textSecondary}
         scheme={theme.scheme}
         style={style}
       />
@@ -90,6 +118,8 @@ export function TripMap({ stops, center, fitKey, style }: TripMapProps) {
     return (
       <GoogleMapsView
         valid={valid}
+        startPin={start}
+        endPin={end}
         routeCoords={routeCoords}
         camera={camera}
         routeColor={theme.colors.route}
@@ -123,22 +153,30 @@ export function TripMap({ stops, center, fitKey, style }: TripMapProps) {
 
 function AppleMapsView({
   valid,
+  startPin,
+  endPin,
   routeCoords,
   camera,
   fitKey,
   routeColor,
   pinColor,
   foodColor,
+  startColor,
+  endColor,
   scheme,
   style,
 }: {
   valid: TripMapStop[];
+  startPin?: TripMapPin;
+  endPin?: TripMapPin;
   routeCoords: { latitude: number; longitude: number }[];
   camera: { coordinates: { latitude: number; longitude: number }; zoom: number };
   fitKey?: string | number;
   routeColor: string;
   pinColor: string;
   foodColor: string;
+  startColor: string;
+  endColor: string;
   scheme: 'light' | 'dark';
   style?: StyleProp<ViewStyle>;
 }) {
@@ -149,7 +187,7 @@ function AppleMapsView({
     ref.current?.setCameraPosition({ coordinates: camera.coordinates, zoom: camera.zoom });
   }, [camera.coordinates, camera.zoom, fitKey]);
 
-  const annotations: AppleMaps.Annotation[] = valid.map((s, i) => ({
+  const stopAnnotations: AppleMaps.Annotation[] = valid.map((s, i) => ({
     id: s.id,
     coordinates: { latitude: s.location.lat, longitude: s.location.lng },
     title: s.name,
@@ -158,6 +196,33 @@ function AppleMapsView({
     textColor: '#FFFFFF',
     tintColor: s.isFood ? foodColor : pinColor,
   }));
+
+  // Distinct endpoint pins: accent for the start, graphite for the end.
+  const endpointAnnotations: AppleMaps.Annotation[] = [];
+  if (startPin) {
+    endpointAnnotations.push({
+      id: '__start__',
+      coordinates: { latitude: startPin.lat, longitude: startPin.lng },
+      title: startPin.label,
+      text: '◉',
+      backgroundColor: startColor,
+      textColor: '#FFFFFF',
+      tintColor: startColor,
+    });
+  }
+  if (endPin) {
+    endpointAnnotations.push({
+      id: '__end__',
+      coordinates: { latitude: endPin.lat, longitude: endPin.lng },
+      title: endPin.label,
+      text: '◆',
+      backgroundColor: endColor,
+      textColor: '#FFFFFF',
+      tintColor: endColor,
+    });
+  }
+
+  const annotations: AppleMaps.Annotation[] = [...endpointAnnotations, ...stopAnnotations];
 
   const polylines: AppleMaps.MapProps['polylines'] =
     routeCoords.length >= 2 ? [{ coordinates: routeCoords, color: routeColor, width: 5 }] : [];
@@ -182,6 +247,8 @@ function AppleMapsView({
 
 function GoogleMapsView({
   valid,
+  startPin,
+  endPin,
   routeCoords,
   camera,
   routeColor,
@@ -191,6 +258,8 @@ function GoogleMapsView({
   style,
 }: {
   valid: TripMapStop[];
+  startPin?: TripMapPin;
+  endPin?: TripMapPin;
   routeCoords: { latitude: number; longitude: number }[];
   camera: { coordinates: { latitude: number; longitude: number }; zoom: number };
   routeColor: string;
@@ -199,12 +268,23 @@ function GoogleMapsView({
   scheme: 'light' | 'dark';
   style?: StyleProp<ViewStyle>;
 }) {
-  const markers: GoogleMaps.Marker[] = valid.map((s, i) => ({
+  const stopMarkers: GoogleMaps.Marker[] = valid.map((s, i) => ({
     id: s.id,
     coordinates: { latitude: s.location.lat, longitude: s.location.lng },
     title: `${i + 1}. ${s.name}`,
     snippet: s.isFood ? 'Food stop' : undefined,
   }));
+
+  // Distinct labelled endpoint markers for the day's start and end.
+  const endpointMarkers: GoogleMaps.Marker[] = [];
+  if (startPin) {
+    endpointMarkers.push({ id: '__start__', coordinates: { latitude: startPin.lat, longitude: startPin.lng }, title: startPin.label, snippet: 'Start' });
+  }
+  if (endPin) {
+    endpointMarkers.push({ id: '__end__', coordinates: { latitude: endPin.lat, longitude: endPin.lng }, title: endPin.label, snippet: 'End' });
+  }
+
+  const markers: GoogleMaps.Marker[] = [...endpointMarkers, ...stopMarkers];
 
   const polylines: GoogleMaps.MapProps['polylines'] =
     routeCoords.length >= 2 ? [{ coordinates: routeCoords, color: routeColor, width: 5 }] : [];

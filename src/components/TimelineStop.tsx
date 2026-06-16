@@ -149,6 +149,12 @@ export function TimelineStop({
             <Fact icon="hourglass" glyph="⏳" color={theme.colors.onGlassSecondary} text={formatDuration(place.dwellMinutes)} theme={theme} />
           </View>
 
+          {isFood && place.dishes && place.dishes.length > 0 ? (
+            <Text variant="caption" tone="secondary" style={{ marginTop: 6 }} numberOfLines={2}>
+              🍽 Try: {place.dishes.join(' · ')}
+            </Text>
+          ) : null}
+
           {payments && payments !== 'Unknown' ? (
             <Text variant="caption" tone="tertiary" style={{ marginTop: 6 }} numberOfLines={1}>
               Pays: {payments}

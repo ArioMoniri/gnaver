@@ -377,6 +377,7 @@ export const tokyoFood: Place[] = [
     tags: ['market', 'sashimi', 'tuna', 'breakfast', 'tamagoyaki'],
     isFood: true,
     mustSee: true,
+    dishes: ['Maguro sashimi', 'Tamagoyaki', 'Grilled scallops with butter soy'],
   },
   {
     id: 'tokyo-food-ichiran-shinjuku',
@@ -399,6 +400,7 @@ export const tokyoFood: Place[] = [
     description: 'Tokyo\'s most famous solo-ramen experience — tonkotsu broth, thin noodles, and a customisation form.',
     tags: ['ramen', 'tonkotsu', 'solo booth', 'Shinjuku', 'iconic'],
     isFood: true,
+    dishes: ['Tonkotsu ramen', 'Kaedama (extra noodles)', 'Ajitsuke tamago'],
   },
   {
     id: 'tokyo-food-depachika-isetan',
@@ -431,6 +433,7 @@ export const tokyoFood: Place[] = [
     description: 'Legendary depachika (department store basement) — wagashi, bento, melon pan, aged beef, French patisseries.',
     tags: ['depachika', 'food hall', 'wagashi', 'bento', 'gourmet'],
     isFood: true,
+    dishes: ['Wagashi confectionery', 'Shokado bento', 'Wagyu beef katsu sando'],
   },
   {
     id: 'tokyo-food-afuri-ramen',
@@ -463,6 +466,7 @@ export const tokyoFood: Place[] = [
     description: 'Award-winning yuzu shio ramen — citrus-kissed broth, free-range chicken, charcoal-grilled chashu.',
     tags: ['ramen', 'yuzu', 'shio', 'Ebisu', 'vegan option'],
     isFood: true,
+    dishes: ['Yuzu shio ramen', 'Chicken chashu', 'Bamboo shoot menma'],
   },
   {
     id: 'tokyo-food-conveyor-belt-sushi-hamazushi',
@@ -495,6 +499,7 @@ export const tokyoFood: Place[] = [
     description: 'Fun budget conveyor-belt sushi near Senso-ji — fresh, fast, and ridiculously good value.',
     tags: ['kaiten-sushi', 'conveyor belt', 'Asakusa', 'budget sushi'],
     isFood: true,
+    dishes: ['Salmon nigiri', 'Ebi tempura gunkan', 'Toro tuna maki'],
   },
   {
     id: 'tokyo-food-shibuya-uobei',
@@ -527,6 +532,7 @@ export const tokyoFood: Place[] = [
     description: 'High-speed sushi delivery by bullet train — choose on touchscreen, served in under 90 seconds.',
     tags: ['kaiten-sushi', 'bullet train', 'Shibuya', 'fun', 'fast'],
     isFood: true,
+    dishes: ['Ikura salmon roe nigiri', 'Uni sea urchin gunkan', 'Aburi scallop sushi'],
   },
   {
     id: 'tokyo-food-yanaka-sembei',
@@ -559,6 +565,7 @@ export const tokyoFood: Place[] = [
     description: 'Old-school sembei shop grilling soy-glazed rice crackers to order on a charcoal grill on Yanaka Ginza.',
     tags: ['sembei', 'rice crackers', 'street food', 'Yanaka', 'traditional'],
     isFood: true,
+    dishes: ['Shoyu sembei', 'Nori sembei', 'Zarame sugar sembei'],
   },
   {
     id: 'tokyo-food-bills-shichirigahama',
@@ -591,5 +598,6 @@ export const tokyoFood: Place[] = [
     description: 'Sydney brunch legend\'s Tokyo outpost — ricotta hotcakes with honeycomb butter and the best eggs.',
     tags: ['brunch', 'hotcakes', 'Omotesando', 'ricotta', 'Australian'],
     isFood: true,
+    dishes: ['Ricotta hotcakes with honeycomb butter', 'Corn fritters', 'Açaí smoothie bowl'],
   },
 ];

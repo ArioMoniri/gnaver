@@ -10,7 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 
-import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan } from '@/core';
+import { formatCostSummary, formatDateLabel, formatDistance, formatDuration, formatMinutes, type DayPlan, type LatLng } from '@/core';
+import { getLocalDishes } from '@/data';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
 import {
@@ -30,10 +31,14 @@ import {
   hapticSelection,
   ImpactFeedbackStyle,
   NotificationFeedbackType,
+  type TripMapPin,
   type TripMapStop,
 } from '@/components';
 
 const MAP_RATIO = 0.46;
+
+const finiteLatLng = (p: LatLng | undefined): p is LatLng =>
+  !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
 
 export default function PlanScreen() {
   const theme = useTheme();
@@ -45,6 +50,7 @@ export default function PlanScreen() {
   const center = useTrip((s) => s.center);
   const currency = useTrip((s) => s.currency);
   const title = useTrip((s) => s.title);
+  const cityId = useTrip((s) => s.cityId);
   const setActiveDay = useTrip((s) => s.setActiveDay);
   const reorderStops = useTrip((s) => s.reorderStops);
   const reset = useTrip((s) => s.reset);
@@ -73,6 +79,21 @@ export default function PlanScreen() {
       })),
     [day],
   );
+
+  // Distinct, labelled map pins for where the day starts and ends.
+  const startPin: TripMapPin | undefined = useMemo(() => {
+    const loc = day?.startLocation ?? day?.window.startLocation;
+    if (!finiteLatLng(loc)) return undefined;
+    return { lat: loc.lat, lng: loc.lng, label: day?.window.startName ?? 'Start' };
+  }, [day]);
+  const endPin: TripMapPin | undefined = useMemo(() => {
+    const loc = day?.endLocation ?? day?.window.endLocation;
+    if (!finiteLatLng(loc)) return undefined;
+    return { lat: loc.lat, lng: loc.lng, label: day?.window.endName ?? 'End' };
+  }, [day]);
+
+  // Must-try local dishes for the destination (curated per-city).
+  const localDishes = useMemo<string[]>(() => (cityId ? getLocalDishes(cityId) : []), [cityId]);
 
   const onSelectDay = useCallback(
     (i: number) => {
@@ -181,7 +202,7 @@ export default function PlanScreen() {
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       {/* Map */}
       <View style={[styles.mapWrap, { height: mapHeight }]}>
-        <TripMap stops={mapStops} center={center} fitKey={safeDay} />
+        <TripMap stops={mapStops} center={center} startPin={startPin} endPin={endPin} fitKey={safeDay} />
 
         {/* Subtle scrim so glass chrome reads over busy map detail. */}
         <LinearGradient
@@ -302,6 +323,23 @@ export default function PlanScreen() {
                 <Text variant="footnote" tone="tertiary" align="center" style={{ marginTop: theme.spacing.xs }}>
                   {dayUnscheduled} {dayUnscheduled === 1 ? "place didn't" : "places didn't"} fit this day
                 </Text>
+              ) : null}
+
+              {/* Must-try local dishes for the destination. */}
+              {localDishes.length > 0 ? (
+                <GlassSurface variant="panel" radius="lg" padding="md" floating style={{ marginTop: theme.spacing.xl }}>
+                  <View style={styles.dishesHead}>
+                    <IconSymbol name="fork.knife" size={15} color={theme.colors.pinFood} fallbackGlyph="🍽" />
+                    <Text variant="subhead" weight="700" tone="onGlass" style={{ flex: 1 }}>
+                      Local dishes to try in {title}
+                    </Text>
+                  </View>
+                  <View style={styles.dishesWrap}>
+                    {localDishes.map((dish) => (
+                      <Tag key={dish} label={dish} tone="food" />
+                    ))}
+                  </View>
+                </GlassSurface>
               ) : null}
             </>
           ) : null}
@@ -462,6 +500,17 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 10,
     marginTop: 14,
+  },
+  dishesHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  dishesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   tripUnsched: {
     borderWidth: StyleSheet.hairlineWidth,

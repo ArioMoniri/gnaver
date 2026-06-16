@@ -72,6 +72,8 @@ interface TripState {
   source?: TripSource;
   cityId?: string;
   sourceUrl?: string;
+  /** True when the imported "list" is actually sample data (couldn't read it). */
+  importedSample: boolean;
   title: string;
   currency: CurrencyCode;
   center?: LatLng;
@@ -124,6 +126,7 @@ const initial = {
   source: undefined as TripSource | undefined,
   cityId: undefined as string | undefined,
   sourceUrl: undefined as string | undefined,
+  importedSample: false,
   title: 'My Trip',
   currency: 'EUR' as CurrencyCode,
   center: undefined as LatLng | undefined,
@@ -270,6 +273,7 @@ export const useTrip = create<TripState>()((set, get) => ({
         center: center ?? meta?.center,
         candidates: places,
         selectedIds: allSelected(places),
+        importedSample: !!parsed.fromSample,
         preferences: { ...get().preferences },
         status: 'candidates',
       });
@@ -293,6 +297,7 @@ export const useTrip = create<TripState>()((set, get) => ({
       center: center ?? meta?.center,
       candidates: sample.places,
       selectedIds: allSelected(sample.places),
+      importedSample: true,
       preferences: { ...get().preferences },
       status: 'candidates',
     });

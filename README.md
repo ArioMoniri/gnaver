@@ -33,7 +33,7 @@ Zero API keys required to try it — everything runs on realistic sample data th
 
 ## ✨ Features
 
-- 📥 **Google Maps list import** — paste a shared-list link and Gnaver resolves every saved place automatically
+- 📥 **Google Maps link import** — paste a list link: single places resolve directly; full lists currently load a sample you can edit
 - 🏙️ **City search** — or just pick a city and let Gnaver find the best places for your interests
 - 🎯 **Interest matching** — Culture, History, Art, Food, Nature, Beaches, Nightlife, Shopping, Architecture, Religion, Photography, Relaxation, Adventure
 - 🚶 **Transport modes** — Walk, Transit, Drive, Bike, or Mixed (auto-switches walk→transit by distance)
@@ -95,9 +95,12 @@ src/
 ├── components/         # Shared UI primitives
 ├── hooks/              # useTheme, useColorScheme
 └── app/                # expo-router file-based screens
-    ├── _layout.tsx
-    ├── index.tsx
-    └── explore.tsx
+    ├── _layout.tsx     # Root stack + theme provider
+    ├── index.tsx       # New Trip — city / Google-list import + setup
+    ├── select.tsx      # Choose places
+    ├── plan.tsx        # Map + time-by-time timeline
+    ├── settings.tsx    # Persisted defaults + API keys
+    └── paywall.tsx     # Gnaver Pro upgrade
 ```
 
 ```mermaid
@@ -122,7 +125,7 @@ graph TD
 
 ## 📱 Screenshots
 
-> Screenshots are generated at 1290×2796 (iPhone 16 Pro Max). Reference files live in [`store/assets/screenshots/`](store/assets/screenshots/).
+> The images below are generated reference assets (1290×2796, iPhone 16 Pro Max), not live device captures. Files live in [`store/assets/screenshots/`](store/assets/screenshots/).
 
 | Home / Import | Place Selection | Map + Timeline | Food & Prices | Weather Re-route |
 |:---:|:---:|:---:|:---:|:---:|

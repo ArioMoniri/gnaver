@@ -405,6 +405,7 @@ export const parisFood: Place[] = [
     tags: ['bistronomie', 'seasonal', 'natural wine', 'Oberkampf', 'top table'],
     isFood: true,
     mustSee: true,
+    dishes: ['Menu dégustation du marché', 'Ris de veau aux champignons', 'Tarte fine aux légumes'],
   },
   {
     id: 'paris-food-bouillon-pigalle',
@@ -437,6 +438,7 @@ export const parisFood: Place[] = [
     description: 'Retro-chic brasserie serving classic French fare — snails, blanquette, profiteroles — at sensational prices.',
     tags: ['bouillon', 'brasserie', 'French classics', 'Pigalle', 'affordable'],
     isFood: true,
+    dishes: ['Escargots de Bourgogne', 'Blanquette de veau', 'Profiteroles au chocolat'],
   },
   {
     id: 'paris-food-du-pain-des-idees',
@@ -467,6 +469,7 @@ export const parisFood: Place[] = [
     description: 'Legendary bakery famed for escargot pastries and pain des amis — Napoleon-era painted façade.',
     tags: ['boulangerie', 'pastry', 'escargot', 'Canal Saint-Martin'],
     isFood: true,
+    dishes: ['Escargot feuilleté pistache-chocolat', 'Pain des amis', 'Chausson aux pommes'],
   },
   {
     id: 'paris-food-chez-janou',
@@ -499,6 +502,7 @@ export const parisFood: Place[] = [
     description: 'Sun-soaked Provençal bistro near Place des Vosges — bouillabaisse, pastis, and over 90 pastis varieties.',
     tags: ['Provençal', 'bouillabaisse', 'Marais', 'French bistro'],
     isFood: true,
+    dishes: ['Bouillabaisse marseillaise', 'Tapenade et crudités', 'Pissaladière'],
   },
   {
     id: 'paris-food-rue-mouffetard',
@@ -530,6 +534,7 @@ export const parisFood: Place[] = [
     description: 'Ancient market street in the Latin Quarter — cheese mongers, fishmongers, crepe stands, rotisserie chicken.',
     tags: ['market street', 'Latin Quarter', 'street food', 'cheese', 'rotisserie'],
     isFood: true,
+    dishes: ['Crêpe au fromage', 'Poulet rôti', 'Fromage de chèvre frais'],
   },
   {
     id: 'paris-food-cafe-de-flore',
@@ -562,6 +567,7 @@ export const parisFood: Place[] = [
     description: 'Art Deco Saint-Germain institution where Sartre and Beauvoir wrote — still the perfect Paris café.',
     tags: ['café', 'Saint-Germain', 'Sartre', 'Art Deco', 'iconic'],
     isFood: true,
+    dishes: ['Café crème', 'Croque-monsieur', 'Tarte aux fruits'],
   },
   {
     id: 'paris-food-falafel-lenfant',
@@ -593,6 +599,7 @@ export const parisFood: Place[] = [
     description: 'The Marais\'s most famous falafel stand — crispy, stuffed with aubergine and tahini. Take-away only.',
     tags: ['falafel', 'Marais', 'Jewish quarter', 'takeaway', 'cheap eat'],
     isFood: true,
+    dishes: ['Falafel pita avec aubergines', 'Shawarma d\'agneau', 'Salade de houmous'],
   },
   {
     id: 'paris-food-le-comptoir-du-relais',
@@ -625,5 +632,6 @@ export const parisFood: Place[] = [
     description: 'Yves Camdeborde\'s beloved Saint-Germain bistro — bistronomie at its purest, terrace overflows nightly.',
     tags: ['bistronomie', 'Saint-Germain', 'terrace', 'classic French'],
     isFood: true,
+    dishes: ['Terrine de foie gras', 'Filet de canard aux cerises', 'Île flottante'],
   },
 ];

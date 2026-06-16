@@ -110,7 +110,7 @@ export function DayOptionsSheet({ visible, onClose }: DayOptionsSheetProps) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: theme.colors.scrim }]}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close" onPress={onClose} />
         <View
           style={[
@@ -330,7 +330,6 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
     paddingTop: 10,

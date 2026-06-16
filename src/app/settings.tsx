@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeProviders, features, runtimeKeys } from '@/services';
 import type { RuntimeKeyName } from '@/services';
-import { formatMinutes, type FoodBudget, type Pace, type TransportMode } from '@/core';
+import { formatMinutes, type FoodBudget, type MealKind, type Pace, type TransportMode } from '@/core';
 import { useTheme } from '@/theme';
 import { useSettings } from '@/store/settingsStore';
 import {
@@ -52,6 +52,11 @@ const BUDGET_OPTIONS: { value: FoodBudget; label: string }[] = [
   { value: 'mid', label: 'Mid' },
   { value: 'fine', label: 'Fine' },
 ];
+const MEAL_OPTIONS: { value: MealKind; label: string; emoji: string }[] = [
+  { value: 'breakfast', label: 'Breakfast', emoji: '🥐' },
+  { value: 'lunch', label: 'Lunch', emoji: '🍽' },
+  { value: 'dinner', label: 'Dinner', emoji: '🌙' },
+];
 
 const toArray = (text: string): string[] =>
   text
@@ -87,6 +92,15 @@ export default function SettingsScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }, [router]);
+
+  const toggleMeal = useCallback(
+    (meal: MealKind) => {
+      hapticSelection();
+      const has = s.meals.includes(meal);
+      s.set({ meals: has ? s.meals.filter((m) => m !== meal) : [...s.meals, meal] });
+    },
+    [s],
+  );
 
   // Re-read live provider status on each render after key edits.
   const providerDesc = describeProviders();
@@ -266,9 +280,25 @@ export default function SettingsScreen() {
           </View>
 
           {s.includeFood ? (
-            <Field label="Food budget" theme={theme}>
-              <Segmented<FoodBudget> options={BUDGET_OPTIONS} value={s.foodBudget} onChange={(foodBudget) => s.set({ foodBudget })} />
-            </Field>
+            <>
+              <Field label="Meals to include" theme={theme}>
+                <View style={styles.chipWrap}>
+                  {MEAL_OPTIONS.map((m) => (
+                    <Chip
+                      key={m.value}
+                      label={m.label}
+                      emoji={m.emoji}
+                      size="sm"
+                      selected={s.meals.includes(m.value)}
+                      onPress={() => toggleMeal(m.value)}
+                    />
+                  ))}
+                </View>
+              </Field>
+              <Field label="Food budget" theme={theme}>
+                <Segmented<FoodBudget> options={BUDGET_OPTIONS} value={s.foodBudget} onChange={(foodBudget) => s.set({ foodBudget })} />
+              </Field>
+            </>
           ) : null}
 
           <Field label="Cuisine preferences" theme={theme}>

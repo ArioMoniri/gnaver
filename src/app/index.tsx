@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { formatMinutes, type FoodBudget, type Interest, type Pace, type TransportMode } from '@/core';
+import { formatMinutes, type FoodBudget, type Interest, type MealKind, type Pace, type TransportMode } from '@/core';
 import { listCities } from '@/data';
 import { useTheme } from '@/theme';
 import { useTrip } from '@/store/tripStore';
@@ -55,6 +55,12 @@ const BUDGET_OPTIONS: { value: FoodBudget; label: string }[] = [
   { value: 'cheap', label: 'Cheap' },
   { value: 'mid', label: 'Mid' },
   { value: 'fine', label: 'Fine' },
+];
+
+const MEAL_OPTIONS: { value: MealKind; label: string; emoji: string }[] = [
+  { value: 'breakfast', label: 'Breakfast', emoji: '🥐' },
+  { value: 'lunch', label: 'Lunch', emoji: '🍽' },
+  { value: 'dinner', label: 'Dinner', emoji: '🌙' },
 ];
 
 const HOUR_STEP = 30;
@@ -112,6 +118,7 @@ export default function NewTripScreen() {
       transport: settings.transport,
       pace: settings.pace,
       includeFood: settings.includeFood,
+      meals: settings.meals,
       foodBudget: settings.foodBudget,
       cuisinePrefs: settings.cuisinePrefs,
       dietary: settings.dietary,
@@ -204,6 +211,17 @@ export default function NewTripScreen() {
     }
     setCuisineDraft('');
   }, [cuisineDraft, cuisinePrefs, trip]);
+
+  const meals = useMemo(() => prefs.meals ?? [], [prefs.meals]);
+  const toggleMeal = useCallback(
+    (meal: MealKind) => {
+      hapticSelection();
+      const has = meals.includes(meal);
+      const next = has ? meals.filter((m) => m !== meal) : [...meals, meal];
+      trip.setPreferences({ meals: next });
+    },
+    [meals, trip],
+  );
 
   const quickBites = (prefs.maxWalkMinutes ?? 0) > 0;
   const toggleQuickBites = useCallback(
@@ -553,6 +571,22 @@ export default function NewTripScreen() {
 
             {prefs.includeFood ? (
               <>
+                <View style={styles.field}>
+                  <SectionLabel theme={theme}>Meals to include</SectionLabel>
+                  <View style={styles.chipWrap}>
+                    {MEAL_OPTIONS.map((m) => (
+                      <Chip
+                        key={m.value}
+                        label={m.label}
+                        emoji={m.emoji}
+                        size="sm"
+                        selected={meals.includes(m.value)}
+                        onPress={() => toggleMeal(m.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+
                 <View style={styles.field}>
                   <SectionLabel theme={theme}>Food budget</SectionLabel>
                   <Segmented<FoodBudget>

@@ -374,6 +374,7 @@ export const lisbonFood: Place[] = [
     description: 'Legendary beer hall famous for Lisbon\'s best giant prawns, clams and garlic crab since 1956.',
     tags: ['seafood', 'cervejaria', 'prawns', 'iconic', 'Portuguese'],
     isFood: true,
+    dishes: ['Gambas grelhadas', 'Sapateira com cerveja', 'Percebes'],
   },
   {
     id: 'lisbon-food-time-out-market',
@@ -407,6 +408,7 @@ export const lisbonFood: Place[] = [
     tags: ['food hall', 'Ribeira Market', 'Portuguese cuisine', 'variety'],
     isFood: true,
     mustSee: true,
+    dishes: ['Bacalhau à brás', 'Bifana', 'Francesinha'],
   },
   {
     id: 'lisbon-food-pasteis-belem',
@@ -440,6 +442,7 @@ export const lisbonFood: Place[] = [
     tags: ['pastel de nata', 'custard tart', 'bakery', 'Belém', 'iconic'],
     isFood: true,
     mustSee: true,
+    dishes: ['Pastel de nata', 'Pastel de nata com canela', 'Café bica'],
   },
   {
     id: 'lisbon-food-solar-dos-presuntos',
@@ -471,6 +474,7 @@ export const lisbonFood: Place[] = [
     description: 'Traditional tasca beloved by locals for roast suckling pig, bacalhau, and aged presunto.',
     tags: ['tasca', 'traditional', 'presunto', 'bacalhau', 'Portuguese'],
     isFood: true,
+    dishes: ['Leitão assado', 'Bacalhau com natas', 'Presunto de Barrancos'],
   },
   {
     id: 'lisbon-food-a-cevicheria',
@@ -502,6 +506,7 @@ export const lisbonFood: Place[] = [
     description: 'Chef Kiko\'s creative ceviche bar in Príncipe Real — giant paper octopus hanging from the ceiling.',
     tags: ['ceviche', 'seafood', 'Príncipe Real', 'creative', 'modern'],
     isFood: true,
+    dishes: ['Ceviche de corvina', 'Polvo à lagareiro', 'Amêijoas à bulhão pato'],
   },
   {
     id: 'lisbon-food-taberna-da-rua-flores',
@@ -532,6 +537,7 @@ export const lisbonFood: Place[] = [
     description: 'Intimate taberna celebrating petiscos (Portuguese tapas) with natural wines in Chiado.',
     tags: ['taberna', 'petiscos', 'tapas', 'natural wine', 'Chiado'],
     isFood: true,
+    dishes: ['Petiscos variados', 'Ovos verdes', 'Chouriço assado'],
   },
   {
     id: 'lisbon-food-zé-da-mouraria',
@@ -562,6 +568,7 @@ export const lisbonFood: Place[] = [
     description: 'No-frills neighbourhood spot in Mouraria serving honest daily specials for under €12.',
     tags: ['tascas', 'lunch', 'local', 'Mouraria', 'cheap eat'],
     isFood: true,
+    dishes: ['Prato do dia', 'Caldo verde', 'Arroz de pato'],
   },
   {
     id: 'lisbon-food-cafe-nicola',
@@ -594,5 +601,6 @@ export const lisbonFood: Place[] = [
     description: 'Historic 18th-century café on Rossio Square — azulejo tiles, gilded mirrors, and perfect espresso.',
     tags: ['historic café', 'espresso', 'Rossio', 'azulejos', 'pastries'],
     isFood: true,
+    dishes: ['Café bica', 'Pastel de nata', 'Tosta mista'],
   },
 ];
