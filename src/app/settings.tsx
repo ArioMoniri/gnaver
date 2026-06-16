@@ -12,6 +12,7 @@ import type { RuntimeKeyName } from '@/services';
 import { formatMinutes, type FoodBudget, type MealKind, type Pace, type TransportMode } from '@/core';
 import { useTheme } from '@/theme';
 import { useSettings } from '@/store/settingsStore';
+import { useCredits } from '@/store';
 import {
   ALL_INTERESTS,
   Button,
@@ -69,6 +70,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const s = useSettings();
+  const balance = useCredits((c) => c.balance);
 
   // Local state for API keys — seeded from runtimeKeys.all() and kept in sync.
   const [keyState, setKeyState] = useState<Partial<Record<RuntimeKeyName, string>>>(() => runtimeKeys.all());
@@ -117,15 +119,15 @@ export default function SettingsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Gnaver Pro upgrade row */}
-        <ProBannerRow onPress={() => router.push('/paywall')} theme={theme} />
+        {/* Gnaver Credits banner row */}
+        <CreditsBannerRow balance={balance} onPress={() => router.push('/paywall')} theme={theme} />
 
         {/* API Keys */}
         <Section title="Your API keys" subtitle="Bring your own keys — free forever" theme={theme}>
           {/* Helper copy */}
           <View style={{ marginBottom: theme.spacing.lg }}>
             <Text variant="footnote" tone="secondary">
-              Keys stay on this device, never uploaded. Without keys, Gnaver uses realistic sample data.
+              Add your keys for live data across every city. Keys stay on this device, never uploaded.
             </Text>
             <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.sm }}>
               <Pressable onPress={() => void Linking.openURL('https://console.cloud.google.com')}>
@@ -137,7 +139,7 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {/* Live/mock badge summary */}
+          {/* Live / connect-a-key badge summary */}
           <View style={[styles.featureRow, { marginBottom: theme.spacing.lg }]}>
             <IconSymbol
               name={features.livePlaces ? 'dot.radiowaves.left.and.right' : 'circle.dashed'}
@@ -362,9 +364,9 @@ export default function SettingsScreen() {
 
         {/* Data sources */}
         <Section title="Data sources" subtitle={describeProviders()} theme={theme}>
-          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Google" mockLabel="Sample data" first theme={theme} />
-          <FeatureRow label="Weather" live={features.liveWeather} liveLabel="Open-Meteo" mockLabel="Mock" theme={theme} />
-          <FeatureRow label="Taste recommender" live={features.liveTaste} liveLabel="LLM" mockLabel="Heuristic" theme={theme} />
+          <FeatureRow label="Places & routing" live={features.livePlaces} liveLabel="Live" offLabel="Connect a key" first theme={theme} />
+          <FeatureRow label="Weather" live liveLabel="Live" offLabel="Connect a key" theme={theme} />
+          <FeatureRow label="Taste recommender" live={features.liveTaste} liveLabel="Live" offLabel="Connect a key" theme={theme} />
         </Section>
 
         {/* About */}
@@ -388,18 +390,20 @@ export default function SettingsScreen() {
   );
 }
 
-/** Subtle Pro upgrade banner at the top of Settings. */
-function ProBannerRow({
+/** Gnaver Credits balance banner at the top of Settings → opens the paywall. */
+function CreditsBannerRow({
+  balance,
   onPress,
   theme,
 }: {
+  balance: number;
   onPress: () => void;
   theme: ReturnType<typeof useTheme>;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Upgrade to Gnaver Pro"
+      accessibilityLabel="Gnaver Credits — pay as you go"
       onPress={() => { hapticSelection(); onPress(); }}
     >
       <GlassCard padding="md" radius="xl">
@@ -408,11 +412,11 @@ function ProBannerRow({
             <IconSymbol name="sparkles" size={20} color={theme.colors.accent} fallbackGlyph="✨" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text variant="headline" weight="700">Gnaver Pro</Text>
-            <Text variant="footnote" tone="secondary">No key setup · hosted AI · unlimited cities</Text>
+            <Text variant="headline" weight="700">Gnaver Credits</Text>
+            <Text variant="footnote" tone="secondary">Pay-as-you-go · hosted AI for your plans</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-            <Tag label="Soon" tone="accent" />
+            <Tag label={`${balance} ${balance === 1 ? 'credit' : 'credits'}`} tone="accent" />
             <IconSymbol name="chevron.right" size={14} color={theme.colors.textTertiary} fallbackGlyph="›" />
           </View>
         </View>
@@ -421,7 +425,7 @@ function ProBannerRow({
   );
 }
 
-/** Key field with a live/mock badge. */
+/** Key field with a Live / Connect-a-key badge. */
 function KeyField({
   label,
   placeholder,
@@ -450,7 +454,7 @@ function KeyField({
         >
           {label}
         </Text>
-        <Tag label={live ? liveLabel : 'Sample data'} tone={live ? 'success' : 'neutral'} />
+        <Tag label={live ? liveLabel : 'Connect a key'} tone={live ? 'success' : 'neutral'} />
       </View>
       <TextInput
         value={value}
@@ -558,14 +562,14 @@ function FeatureRow({
   label,
   live,
   liveLabel,
-  mockLabel,
+  offLabel,
   first,
   theme,
 }: {
   label: string;
   live: boolean;
   liveLabel: string;
-  mockLabel: string;
+  offLabel: string;
   first?: boolean;
   theme: ReturnType<typeof useTheme>;
 }) {
@@ -580,7 +584,7 @@ function FeatureRow({
       <Text variant="subhead" style={{ flex: 1 }}>
         {label}
       </Text>
-      <Tag label={live ? liveLabel : mockLabel} tone={live ? 'success' : 'neutral'} />
+      <Tag label={live ? liveLabel : offLabel} tone={live ? 'success' : 'neutral'} />
     </View>
   );
 }

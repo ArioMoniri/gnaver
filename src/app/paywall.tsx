@@ -1,11 +1,16 @@
 /**
- * Paywall — "Gnaver Pro" premium modal.
+ * Paywall — "Gnaver Credits" pay-as-you-go screen.
  *
- * IAP is scaffolded only: tapping "Start Pro" shows an alert explaining that
- * subscriptions are coming soon. Real StoreKit / expo-iap wiring requires
- * App Store Connect product IDs and is omitted by design.
+ * Two ways to run the AI:
+ *   • Bring your own API keys  → free, unlimited (you pay your own provider).
+ *   • Buy credits             → we run the hosted AI for you (1 credit / plan).
  *
- * Layout: hero glyph → plan toggle → two plan cards → CTA → footnote links.
+ * In-app purchases are scaffolded only: tapping "Buy" shows an honest alert.
+ * It never fake-adds credits — real fulfilment needs App Store Connect
+ * consumables plus a hosted backend (see docs/MONETIZATION.md).
+ *
+ * Layout: hero glyph + live balance → model explainer → credit-pack cards →
+ * primary buy CTA → "continue free" → legal footnotes.
  */
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -22,14 +27,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CREDIT_PACKS, CREDITS_PER_PLAN, useCredits, type CreditPack } from '@/store';
 import { useTheme } from '@/theme';
 import {
   Button,
   GlassCard,
-  GlassSurface,
   IconSymbol,
   Screen,
-  Segmented,
   Tag,
   Text,
   hapticImpact,
@@ -39,27 +43,14 @@ import {
   NotificationFeedbackType,
 } from '@/components';
 
-// ─── Plan data ────────────────────────────────────────────────────────────────
+const REPO_URL = 'https://github.com/ArioMoniri/gnaver';
 
-type BillingCycle = 'monthly' | 'yearly';
-
-const PLAN_OPTIONS: { value: BillingCycle; label: string }[] = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'yearly', label: 'Yearly  −50%' },
-];
-
-const PRICES: Record<BillingCycle, { display: string; subline: string }> = {
-  monthly: { display: '$4.99', subline: 'per month' },
-  yearly:  { display: '$29.99', subline: 'per year — save 50%' },
-};
-
-const PRO_BENEFITS = [
-  { icon: '✨', text: 'No key setup — we run the AI for you' },
-  { icon: '🌐', text: 'Hosted AI with priority routing' },
-  { icon: '🗺️', text: 'Unlimited cities and multi-city trips' },
-  { icon: '⚡️', text: 'Faster responses, latest models' },
-  { icon: '🔒', text: 'Privacy-first — zero data retention' },
-];
+/** Per-credit unit price, e.g. "$0.30 / credit", parsed from the pack's display price. */
+function perCreditLabel(pack: CreditPack): string {
+  const amount = Number(pack.price.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(amount) || pack.credits <= 0) return '';
+  return `$${(amount / pack.credits).toFixed(2)} / credit`;
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -67,7 +58,12 @@ export default function PaywallScreen() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [cycle, setCycle] = useState<BillingCycle>('yearly');
+  const balance = useCredits((c) => c.balance);
+
+  const [selectedId, setSelectedId] = useState<string>(
+    CREDIT_PACKS.find((p) => p.tag === 'Popular')?.id ?? CREDIT_PACKS[0]?.id ?? '',
+  );
+  const selectedPack = CREDIT_PACKS.find((p) => p.id === selectedId) ?? CREDIT_PACKS[0];
 
   const close = useCallback(() => {
     hapticSelection();
@@ -75,13 +71,18 @@ export default function PaywallScreen() {
     else router.replace('/');
   }, [router]);
 
-  const handleStartPro = useCallback(() => {
+  const handleSelect = useCallback((id: string) => {
+    hapticSelection();
+    setSelectedId(id);
+  }, []);
+
+  const handleBuy = useCallback(() => {
     hapticImpact(ImpactFeedbackStyle.Medium);
     Alert.alert(
-      'Coming Soon',
-      'Subscriptions are coming soon! For now, Gnaver is completely free — add your own API keys in Settings to unlock live data.',
+      'Launching soon',
+      'In-app purchases are launching soon — for now, Gnaver is free with your own API keys (Settings).',
       [
-        { text: 'Add my keys', style: 'default', onPress: () => { close(); router.push('/settings'); } },
+        { text: 'Use my keys', style: 'default', onPress: () => { close(); router.push('/settings'); } },
         { text: 'OK', style: 'cancel' },
       ],
     );
@@ -95,10 +96,8 @@ export default function PaywallScreen() {
 
   const handleRestore = useCallback(() => {
     hapticNotify(NotificationFeedbackType.Success);
-    Alert.alert('Restore Purchases', 'No active subscription found. Subscriptions will be available soon.');
+    Alert.alert('Restore purchases', 'No previous purchases found. Credit purchases are launching soon.');
   }, []);
-
-  const price = PRICES[cycle];
 
   return (
     <Screen onBack={close} backVariant="close" edgeToEdgeBottom background={theme.colors.background}>
@@ -112,35 +111,40 @@ export default function PaywallScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Hero ──────────────────────────────────────────────────────────── */}
-        <HeroSection theme={theme} />
+        {/* ── Hero + live balance ───────────────────────────────────────────── */}
+        <HeroSection theme={theme} balance={balance} />
 
-        {/* ── Billing toggle ────────────────────────────────────────────────── */}
-        <Segmented<BillingCycle>
-          options={PLAN_OPTIONS}
-          value={cycle}
-          onChange={(v) => { hapticSelection(); setCycle(v); }}
-        />
+        {/* ── Model explainer ───────────────────────────────────────────────── */}
+        <GlassCard padding="lg" radius="xl">
+          <Text variant="subhead" tone="secondary" align="center">
+            Bring your own API keys — free, unlimited. Or buy credits and we run the AI for you
+            {` (${CREDITS_PER_PLAN} credit = 1 optimized plan).`}
+          </Text>
+        </GlassCard>
 
-        {/* ── Plan cards ────────────────────────────────────────────────────── */}
+        {/* ── Credit packs ──────────────────────────────────────────────────── */}
         <View style={{ gap: theme.spacing.md }}>
-          {/* Free card (current) */}
-          <FreePlanCard theme={theme} onPress={handleContinueFree} />
-
-          {/* Pro card */}
-          <ProPlanCard theme={theme} cycle={cycle} price={price} onPress={handleStartPro} />
+          {CREDIT_PACKS.map((pack) => (
+            <CreditPackCard
+              key={pack.id}
+              pack={pack}
+              selected={pack.id === selectedId}
+              onPress={() => handleSelect(pack.id)}
+              theme={theme}
+            />
+          ))}
         </View>
 
         {/* ── Primary CTA ───────────────────────────────────────────────────── */}
         <Button
-          title={`Start Pro — ${price.display}/${cycle === 'monthly' ? 'mo' : 'yr'}`}
+          title={selectedPack ? `Buy ${selectedPack.credits} credits — ${selectedPack.price}` : 'Buy credits'}
           variant="primary"
           size="lg"
           fullWidth
           icon="sparkles"
           iconFallback="✨"
           haptic="impact"
-          onPress={handleStartPro}
+          onPress={handleBuy}
         />
 
         {/* ── Secondary CTA ─────────────────────────────────────────────────── */}
@@ -160,7 +164,7 @@ export default function PaywallScreen() {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-function HeroSection({ theme }: { theme: ReturnType<typeof useTheme> }) {
+function HeroSection({ theme, balance }: { theme: ReturnType<typeof useTheme>; balance: number }) {
   const pulse = useRef(new Animated.Value(1)).current;
 
   const onPressIn = useCallback(() => {
@@ -177,7 +181,7 @@ function HeroSection({ theme }: { theme: ReturnType<typeof useTheme> }) {
 
       <Animated.View style={[{ transform: [{ scale: pulse }] }]}>
         <Pressable
-          accessibilityLabel="Gnaver Pro"
+          accessibilityLabel="Gnaver Credits"
           onPressIn={onPressIn}
           onPressOut={onPressOut}
           style={styles.heroGlyphWrap}
@@ -190,115 +194,110 @@ function HeroSection({ theme }: { theme: ReturnType<typeof useTheme> }) {
           >
             {/* Specular highlight */}
             <View pointerEvents="none" style={[styles.heroSpecular, { backgroundColor: theme.colors.glassStroke }]} />
-            <IconSymbol name="map.fill" size={44} color={theme.colors.onAccent} fallbackGlyph="🗺" />
+            <IconSymbol name="sparkles" size={44} color={theme.colors.onAccent} fallbackGlyph="✨" />
           </LinearGradient>
         </Pressable>
       </Animated.View>
 
       <View style={styles.heroText}>
         <Text variant="title" weight="800" align="center">
-          Gnaver Pro
+          Gnaver Credits
         </Text>
-        <Text variant="callout" tone="secondary" align="center" style={{ marginTop: 6, maxWidth: 260 }}>
-          Travel smarter. No API key setup — we handle the AI so you can focus on the trip.
+
+        {/* Live balance pill */}
+        <View
+          style={[
+            styles.balancePill,
+            {
+              backgroundColor: theme.colors.accentSoft,
+              borderColor: theme.colors.accent + '55',
+              borderRadius: theme.radius.pill,
+              marginTop: theme.spacing.md,
+            },
+          ]}
+        >
+          <View style={[styles.balanceDot, { backgroundColor: theme.colors.accent }]} />
+          <Text variant="subhead" weight="700" tone="accent">
+            {balance} {balance === 1 ? 'credit' : 'credits'}
+          </Text>
+        </View>
+
+        <Text variant="callout" tone="secondary" align="center" style={{ marginTop: theme.spacing.md, maxWidth: 280 }}>
+          Pay only for the plans you generate. No recurring charges, no commitment.
         </Text>
       </View>
     </View>
   );
 }
 
-// ─── Free plan card ───────────────────────────────────────────────────────────
+// ─── Credit pack card ─────────────────────────────────────────────────────────
 
-function FreePlanCard({
-  theme,
+function CreditPackCard({
+  pack,
+  selected,
   onPress,
-}: {
-  theme: ReturnType<typeof useTheme>;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress}>
-      <GlassCard padding="lg" radius="xl">
-        <View style={styles.planHeader}>
-          <View>
-            <Text variant="headline" weight="700">Free</Text>
-            <Text variant="footnote" tone="secondary">Your own keys</Text>
-          </View>
-          <Tag label="Current" tone="neutral" />
-        </View>
-        <View style={[styles.divider, { backgroundColor: theme.colors.border, marginVertical: theme.spacing.md }]} />
-        <View style={{ gap: theme.spacing.sm }}>
-          <BenefitRow icon="🔑" text="Bring your own API keys" theme={theme} />
-          <BenefitRow icon="📊" text="Realistic sample data without keys" theme={theme} />
-          <BenefitRow icon="🏙️" text="All supported cities" theme={theme} />
-        </View>
-      </GlassCard>
-    </Pressable>
-  );
-}
-
-// ─── Pro plan card ────────────────────────────────────────────────────────────
-
-function ProPlanCard({
   theme,
-  cycle,
-  price,
-  onPress,
 }: {
-  theme: ReturnType<typeof useTheme>;
-  cycle: BillingCycle;
-  price: { display: string; subline: string };
+  pack: CreditPack;
+  selected: boolean;
   onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
 }) {
+  const unit = perCreditLabel(pack);
   return (
-    <Pressable accessibilityRole="button" onPress={onPress}>
-      {/* Outer glow border — accent soft ring */}
+    <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress}>
       <View
         style={[
-          styles.proCardGlow,
-          { borderRadius: theme.radius.xl + 2, borderColor: theme.colors.accent + '55' },
+          styles.packGlow,
+          {
+            borderRadius: theme.radius.xl + 2,
+            borderColor: selected ? theme.colors.accent : 'transparent',
+          },
         ]}
       >
-        <GlassCard padding="lg" radius="xl" floating>
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.colors.accentSoft, 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={[StyleSheet.absoluteFill, { borderRadius: theme.radius.xl }]}
-          />
-          <View style={styles.planHeader}>
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                <Text variant="headline" weight="700">Pro</Text>
-                <Tag label="✨ Recommended" tone="accent" />
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 2 }}>
-                <Text variant="title2" weight="800" tone="accent">{price.display}</Text>
-                <Text variant="footnote" tone="secondary">{price.subline}</Text>
-              </View>
-            </View>
-          </View>
-
-          {cycle === 'yearly' ? (
-            <View
-              style={[
-                styles.savingsBadge,
-                { backgroundColor: theme.colors.success + '22', borderRadius: theme.radius.sm, marginTop: theme.spacing.sm },
-              ]}
-            >
-              <Text variant="footnote" tone="success" weight="600">
-                Save ~$30/year vs monthly
-              </Text>
-            </View>
+        <GlassCard padding="lg" radius="xl" floating={selected}>
+          {selected ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={[theme.colors.accentSoft, 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: theme.radius.xl }]}
+            />
           ) : null}
 
-          <View style={[styles.divider, { backgroundColor: theme.colors.border, marginVertical: theme.spacing.md }]} />
+          <View style={styles.packRow}>
+            {/* Selection check + credits */}
+            <View style={styles.packLeft}>
+              <View
+                style={[
+                  styles.radio,
+                  {
+                    borderColor: selected ? theme.colors.accent : theme.colors.border,
+                    backgroundColor: selected ? theme.colors.accent : 'transparent',
+                  },
+                ]}
+              >
+                {selected ? (
+                  <IconSymbol name="checkmark" size={12} color={theme.colors.onAccent} fallbackGlyph="✓" weight="bold" />
+                ) : null}
+              </View>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                  <Text variant="title2" weight="800">{pack.credits}</Text>
+                  <Text variant="subhead" tone="secondary" weight="600">credits</Text>
+                  {pack.tag ? <Tag label={pack.tag} tone="accent" /> : null}
+                </View>
+                {unit ? (
+                  <Text variant="footnote" tone="tertiary" style={{ marginTop: 2 }}>{unit}</Text>
+                ) : null}
+              </View>
+            </View>
 
-          <View style={{ gap: theme.spacing.sm }}>
-            {PRO_BENEFITS.map((b) => (
-              <BenefitRow key={b.text} icon={b.icon} text={b.text} theme={theme} accent />
-            ))}
+            {/* Price */}
+            <Text variant="headline" weight="800" tone={selected ? 'accent' : 'primary'}>
+              {pack.price}
+            </Text>
           </View>
         </GlassCard>
       </View>
@@ -306,28 +305,7 @@ function ProPlanCard({
   );
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-function BenefitRow({
-  icon,
-  text,
-  theme,
-  accent = false,
-}: {
-  icon: string;
-  text: string;
-  theme: ReturnType<typeof useTheme>;
-  accent?: boolean;
-}) {
-  return (
-    <View style={styles.benefitRow}>
-      <Text variant="subhead">{icon}</Text>
-      <Text variant="subhead" tone={accent ? 'primary' : 'secondary'} style={{ flex: 1 }}>
-        {text}
-      </Text>
-    </View>
-  );
-}
+// ─── Footnotes ────────────────────────────────────────────────────────────────
 
 function FootnoteLinks({ onRestore }: { onRestore: () => void }) {
   return (
@@ -336,11 +314,11 @@ function FootnoteLinks({ onRestore }: { onRestore: () => void }) {
         <Text variant="footnote" tone="accent">Restore purchases</Text>
       </Pressable>
       <Text variant="footnote" tone="tertiary">·</Text>
-      <Pressable onPress={() => void Linking.openURL('https://github.com/ArioMoniri/gnaver')} accessibilityRole="link">
+      <Pressable onPress={() => void Linking.openURL(REPO_URL)} accessibilityRole="link">
         <Text variant="footnote" tone="tertiary">Terms</Text>
       </Pressable>
       <Text variant="footnote" tone="tertiary">·</Text>
-      <Pressable onPress={() => void Linking.openURL('https://github.com/ArioMoniri/gnaver')} accessibilityRole="link">
+      <Pressable onPress={() => void Linking.openURL(REPO_URL)} accessibilityRole="link">
         <Text variant="footnote" tone="tertiary">Privacy</Text>
       </Pressable>
     </View>
@@ -387,26 +365,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  planHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-  },
-  benefitRow: {
+  balancePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  proCardGlow: {
+  balanceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  packGlow: {
     borderWidth: 1.5,
   },
-  savingsBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  packRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  packLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footnote: {
     flexDirection: 'row',

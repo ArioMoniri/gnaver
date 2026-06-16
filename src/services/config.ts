@@ -65,8 +65,8 @@ export const features = {
 
 export function describeProviders(): string {
   return [
-    `places: ${features.livePlaces ? 'google' : 'mock'}`,
-    `weather: open-meteo`,
-    `taste: ${features.liveTaste ? serviceConfig.llmProvider : 'heuristic'}`,
-  ].join(' · ');
+    `Places: ${features.livePlaces ? 'Google · live' : 'connect a key'}`,
+    `Weather: Open-Meteo · live`,
+    `Taste: ${features.liveTaste ? `${serviceConfig.llmProvider} · live` : 'connect a key'}`,
+  ].join('   ');
 }
