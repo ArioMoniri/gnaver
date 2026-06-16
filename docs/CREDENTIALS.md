@@ -59,16 +59,17 @@ npx eas-cli init          # writes the EAS projectId (picked up by app.config.ts
 
 ## 3. Apple App Store submit → `eas.json` + EAS credentials
 
-Fill the placeholders in [`eas.json`](../eas.json) under `submit.production.ios`:
+Most of this is already done / auto-resolved — you should not have to hunt for ids:
 
-| Field | What | Where to find it |
+| Field | Status | Notes |
 |---|---|---|
-| `appleId` | Your Apple ID email | — |
-| `appleTeamId` | 10-char Team ID | [developer.apple.com](https://developer.apple.com/account) → Membership |
-| `ascAppId` | Numeric App Store Connect app id | [App Store Connect](https://appstoreconnect.apple.com/) → create the app (bundle `com.ariomoniri.gnaver`) → App Information |
+| `appleTeamId` | ✅ **already set to `FF68N39FU5`** in [`eas.json`](../eas.json) | Read automatically from your Mac's Apple Developer cert. Team IDs aren't secret. |
+| `ascAppId` | 🤖 **auto-created** — leave it out | It doesn't exist until the App Store Connect app record exists. `eas submit` finds-or-**creates** the app (by bundle `com.ariomoniri.gnaver`) on first run and resolves this for you. |
+| `appleId` (your Apple ID email) | 🔒 **provide via env, not the repo** | `export EXPO_APPLE_ID="you@example.com"` before submitting (keeps your email out of the public repo), or just type it at the interactive prompt. |
 
-For non-interactive signing/submit, create an **App Store Connect API key** (`.p8`)
-in App Store Connect → Users and Access → Integrations → keys, then let EAS manage it:
+For **non-interactive** signing/submit (CI), create an **App Store Connect API key** (`.p8`)
+in App Store Connect → Users and Access → Integrations → keys, then let EAS manage it
+(this also removes any need for `appleId`/`EXPO_APPLE_ID`):
 
 ```bash
 npx eas-cli credentials        # store the .p8, key id, and issuer id in EAS (never in the repo)
@@ -90,6 +91,6 @@ Requires an active **Apple Developer Program** membership ($99/yr).
 - [ ] `cp .env.example .env` and add your Google + LLM keys (optional — sample data works without)
 - [ ] `npx eas-cli login` (and `EXPO_TOKEN` GitHub secret for CI)
 - [ ] `npx eas-cli init`
-- [ ] Fill `eas.json` → `submit.production.ios`
-- [ ] `npx eas-cli credentials` (App Store Connect API key)
-- [ ] `npx eas-cli build --platform ios --profile production` → `submit`
+- [x] `appleTeamId` set (`FF68N39FU5`) — done
+- [ ] `export EXPO_APPLE_ID="you@example.com"` (or type it at the prompt)
+- [ ] `npx eas-cli build --platform ios --profile production` → `eas-cli submit` (creates the App Store Connect app + resolves `ascAppId` automatically)
