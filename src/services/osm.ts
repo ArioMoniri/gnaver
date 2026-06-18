@@ -29,7 +29,13 @@ import { currencyForCountry } from '@/core';
 const TIMEOUT_MS = 15_000;
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// Overpass mirrors, tried in order — the main instance 406s/429s under load, so
+// we fail over to public mirrors for resilience.
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
 // Nominatim's usage policy requires a descriptive UA identifying the app.
 const USER_AGENT = 'gnaver-trip-planner/1.0 (https://github.com/ArioMoniri)';
 
@@ -61,14 +67,17 @@ interface GeoResult {
   population?: number;
 }
 
-async function geocode(query: string, count: number): Promise<GeoResult[]> {
+async function geocode(query: string): Promise<GeoResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const url =
     `${GEOCODE_URL}?name=${encodeURIComponent(q)}` +
-    `&count=${count}&language=en&format=json`;
+    `&count=10&language=en&format=json`;
   const data = await jsonFetch<{ results?: GeoResult[] }>(url);
-  return data.results ?? [];
+  // Open-Meteo ranks by name match, so a hamlet literally named "Siem" outranks
+  // "Siem Reap". For a travel planner, bias toward the better-known destination
+  // by population (stable sort keeps the API order for ties / unknown pop).
+  return [...(data.results ?? [])].sort((a, b) => (b.population ?? 0) - (a.population ?? 0));
 }
 
 function geoToCity(r: GeoResult): ResolvedCity {
@@ -85,7 +94,7 @@ function geoToCity(r: GeoResult): ResolvedCity {
 /** Resolve a city name to its center, country, currency and timezone. */
 export async function osmResolveCity(query: string): Promise<ResolvedCity | null> {
   try {
-    const results = await geocode(query, 1);
+    const results = await geocode(query);
     return results.length ? geoToCity(results[0]) : null;
   } catch {
     return null;
@@ -95,7 +104,7 @@ export async function osmResolveCity(query: string): Promise<ResolvedCity | null
 /** Type-ahead city suggestions, e.g. "Siem Reap, Siem Reap, Cambodia". */
 export async function osmAutocompleteCities(query: string): Promise<CitySuggestion[]> {
   try {
-    const results = await geocode(query, 6);
+    const results = (await geocode(query)).slice(0, 6);
     return results.map((r) => ({
       label: [r.name, r.admin1 && r.admin1 !== r.name ? r.admin1 : null, r.country]
         .filter(Boolean)
@@ -259,12 +268,27 @@ function prominence(el: OverpassElement): number {
 }
 
 async function overpass(query: string): Promise<OverpassElement[]> {
-  const data = await jsonFetch<{ elements?: OverpassElement[] }>(OVERPASS_URL, {
+  // Overpass's Apache front-end returns 406 Not Acceptable without an explicit
+  // Accept header + a descriptive User-Agent, so both are required here.
+  const init: RequestInit = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      'User-Agent': USER_AGENT,
+    },
     body: `data=${encodeURIComponent(query)}`,
-  });
-  return data.elements ?? [];
+  };
+  let lastErr: unknown;
+  for (const url of OVERPASS_URLS) {
+    try {
+      const data = await jsonFetch<{ elements?: OverpassElement[] }>(url, init);
+      return data.elements ?? [];
+    } catch (e) {
+      lastErr = e; // try the next mirror
+    }
+  }
+  throw lastErr ?? new Error('All Overpass mirrors failed');
 }
 
 function dedupeByName(places: Place[]): Place[] {
