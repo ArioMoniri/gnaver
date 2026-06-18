@@ -36,12 +36,14 @@ const OVERPASS_URLS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
+// Per-mirror timeout. Mirrors are raced, so a slow one is abandoned, not waited on.
+const OVERPASS_TIMEOUT_MS = 12_000;
 // Nominatim's usage policy requires a descriptive UA identifying the app.
 const USER_AGENT = 'gnaver-trip-planner/1.0 (https://github.com/ArioMoniri)';
 
-async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
+async function jsonFetch<T>(url: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
@@ -50,6 +52,37 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
     clearTimeout(timer);
   }
 }
+
+/** Resolve with the first promise that fulfils; reject only if all reject. */
+function firstSuccessful<T>(promises: Promise<T>[]): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let pending = promises.length;
+    if (pending === 0) {
+      reject(new Error('no attempts'));
+      return;
+    }
+    let settled = false;
+    for (const p of promises) {
+      p.then(
+        (v) => {
+          if (!settled) {
+            settled = true;
+            resolve(v);
+          }
+        },
+        () => {
+          if (--pending === 0 && !settled) reject(new Error('all overpass mirrors failed'));
+        },
+      );
+    }
+  });
+}
+
+// Session caches so re-opening the same city (or re-generating) is instant.
+const poiCache = new Map<string, Place[]>();
+const foodCache = new Map<string, Place[]>();
+const cacheKey = (p: LatLng, r: number, tag: string): string =>
+  `${tag}:${p.lat.toFixed(3)},${p.lng.toFixed(3)}:${r}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Open-Meteo Geocoding — city name → place
@@ -252,6 +285,8 @@ function elementToPlace(el: OverpassElement, isFood: boolean): Place | null {
     weatherSensitivity: weatherSensitivityByCategory(category),
     address,
     photoUrl: /^https?:\/\//.test(tags.image ?? '') ? tags.image : undefined,
+    // Carry the OSM cuisine tag so cached eateries can still be cuisine-ranked.
+    tags: tags.cuisine ? tags.cuisine.split(';').map((s) => s.trim()).filter(Boolean) : undefined,
     isFood: isFood || undefined,
   };
 }
@@ -279,16 +314,14 @@ async function overpass(query: string): Promise<OverpassElement[]> {
     },
     body: `data=${encodeURIComponent(query)}`,
   };
-  let lastErr: unknown;
-  for (const url of OVERPASS_URLS) {
-    try {
-      const data = await jsonFetch<{ elements?: OverpassElement[] }>(url, init);
-      return data.elements ?? [];
-    } catch (e) {
-      lastErr = e; // try the next mirror
-    }
-  }
-  throw lastErr ?? new Error('All Overpass mirrors failed');
+  // Race every mirror — the public instances vary wildly in load (1s vs 30s), so
+  // the fastest one to answer wins and a slow/erroring instance never blocks.
+  const attempts = OVERPASS_URLS.map((url) =>
+    jsonFetch<{ elements?: OverpassElement[] }>(url, init, OVERPASS_TIMEOUT_MS).then(
+      (d) => d.elements ?? [],
+    ),
+  );
+  return firstSuccessful(attempts);
 }
 
 function dedupeByName(places: Place[]): Place[] {
@@ -308,36 +341,53 @@ export async function osmSearchPlaces(
   center: LatLng,
   interests: Interest[],
   limit: number,
-  radiusMeters = 6000,
+  // 8 km catches headline sights that sit outside the town centre (e.g. Angkor
+  // Wat is ~6 km north of Siem Reap) while the lean query still returns in ~2-3s.
+  radiusMeters = 8000,
 ): Promise<Place[]> {
+  const r = Math.round(radiusMeters);
+  const key = cacheKey(center, r, 'poi');
+  const cached = poiCache.get(key);
+  if (cached) return rankPoi(cached, interests, limit);
   try {
-    const r = Math.round(radiusMeters);
     const at = `(around:${r},${center.lat.toFixed(5)},${center.lng.toFixed(5)})`;
+    // Lean query: notable POIs only. The broad `historic` scan is constrained to
+    // wikidata-tagged (i.e. notable) sites — this is the difference between ~2s
+    // and a 25s+ timeout, and still catches the headline sights (e.g. Angkor Wat,
+    // tagged historic+wikidata). Worship/park-without-wikidata is dropped for
+    // speed; major ones carry tourism/historic+wikidata tags and still appear.
+    // `nw` (no relations) avoids expensive relation centroid computation.
     const query =
-      `[out:json][timeout:25];(` +
-      `nwr["tourism"~"^(attraction|museum|gallery|artwork|viewpoint|zoo|theme_park|aquarium)$"]["name"]${at};` +
-      `nwr["historic"]["name"]${at};` +
-      `nwr["leisure"~"^(park|garden|nature_reserve)$"]["name"]${at};` +
-      `nwr["natural"="beach"]["name"]${at};` +
-      `nwr["amenity"="place_of_worship"]["name"]["wikidata"]${at};` +
-      `);out center 120;`;
+      `[out:json][timeout:12];(` +
+      `nw["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|theme_park|aquarium)$"]["name"]${at};` +
+      `nw["historic"]["name"]["wikidata"]${at};` +
+      `);out center 100;`;
     const elements = await overpass(query);
-    const wanted = new Set<Interest>(interests);
-    const scored = elements
+    // Cache the prominence-ranked superset; per-call interest weighting is applied
+    // in rankPoi so a cached city re-ranks instantly for different interests.
+    const ranked = elements
       .map((el) => ({ el, place: elementToPlace(el, false) }))
       .filter((x): x is { el: OverpassElement; place: Place } => x.place !== null)
-      .map((x) => ({
-        place: x.place,
-        score:
-          prominence(x.el) +
-          x.place.interests.filter((i) => wanted.has(i)).length,
-      }))
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => prominence(b.el) - prominence(a.el))
       .map((x) => x.place);
-    return dedupeByName(scored).slice(0, limit);
+    const deduped = dedupeByName(ranked);
+    poiCache.set(key, deduped);
+    return rankPoi(deduped, interests, limit);
   } catch {
     return [];
   }
+}
+
+/** Re-rank a cached POI superset by interest fit (cheap, no network). */
+function rankPoi(places: Place[], interests: Interest[], limit: number): Place[] {
+  const wanted = new Set<Interest>(interests);
+  // Stable sort that nudges interest-matching places up without losing the
+  // prominence order the list was cached in.
+  return [...places]
+    .map((p, i) => ({ p, i, fit: p.interests.filter((x) => wanted.has(x)).length }))
+    .sort((a, b) => b.fit - a.fit || a.i - b.i)
+    .map((x) => x.p)
+    .slice(0, limit);
 }
 
 /** Restaurants / cafés / bars around `near`. */
@@ -347,27 +397,40 @@ export async function osmSuggestFood(
   limit: number,
   radiusMeters = 1500,
 ): Promise<Place[]> {
+  const r = Math.round(radiusMeters);
+  const key = cacheKey(near, r, 'food');
+  const cached = foodCache.get(key);
+  if (cached) return rankFood(cached, cuisine, limit);
   try {
-    const r = Math.round(radiusMeters);
     const at = `(around:${r},${near.lat.toFixed(5)},${near.lng.toFixed(5)})`;
+    // nodes+ways only, capped, short timeout — eateries are dense so a tight
+    // radius + low cap keeps this fast.
     const query =
-      `[out:json][timeout:25];(` +
-      `nwr["amenity"~"^(restaurant|cafe|bar|pub|fast_food)$"]["name"]${at};` +
-      `);out center 80;`;
+      `[out:json][timeout:12];(` +
+      `nw["amenity"~"^(restaurant|cafe|bar|pub|fast_food)$"]["name"]${at};` +
+      `);out center 60;`;
     const elements = await overpass(query);
-    const cuisineLower = (cuisine ?? []).map((c) => c.toLowerCase());
-    const scored = elements
-      .map((el) => ({ el, place: elementToPlace(el, true) }))
-      .filter((x): x is { el: OverpassElement; place: Place } => x.place !== null)
-      .map((x) => {
-        const tagCuisine = (x.el.tags?.cuisine ?? '').toLowerCase();
-        const cuisineHit = cuisineLower.some((c) => tagCuisine.includes(c)) ? 2 : 0;
-        return { place: x.place, score: cuisineHit + (x.el.tags?.wikidata ? 1 : 0) };
-      })
-      .sort((a, b) => b.score - a.score)
-      .map((x) => x.place);
-    return dedupeByName(scored).slice(0, limit);
+    const places = elements
+      .map((el) => elementToPlace(el, true))
+      .filter((p): p is Place => p !== null);
+    const deduped = dedupeByName(places);
+    foodCache.set(key, deduped);
+    return rankFood(deduped, cuisine, limit);
   } catch {
     return [];
   }
+}
+
+/** Rank cached eateries by cuisine match (cheap, no network). */
+function rankFood(places: Place[], cuisine: string[] | undefined, limit: number): Place[] {
+  const cuisineLower = (cuisine ?? []).map((c) => c.toLowerCase());
+  return [...places]
+    .map((p, i) => {
+      const tags = (p.tags ?? []).join(' ').toLowerCase();
+      const hit = cuisineLower.some((c) => p.name.toLowerCase().includes(c) || tags.includes(c)) ? 1 : 0;
+      return { p, i, hit };
+    })
+    .sort((a, b) => b.hit - a.hit || a.i - b.i)
+    .map((x) => x.p)
+    .slice(0, limit);
 }
