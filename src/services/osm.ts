@@ -137,8 +137,13 @@ export async function osmResolveCity(query: string): Promise<ResolvedCity | null
 /** Type-ahead city suggestions, e.g. "Siem Reap, Siem Reap, Cambodia". */
 export async function osmAutocompleteCities(query: string): Promise<CitySuggestion[]> {
   try {
-    const results = (await geocode(query)).slice(0, 6);
-    return results.map((r) => ({
+    let results = await geocode(query);
+    // "Phnom Penh, Cambodia" (iOS autofill appends the country) can geocode to
+    // nothing — retry on just the city part so the suggestion still appears.
+    if (results.length === 0 && query.includes(',')) {
+      results = await geocode(query.split(',')[0].trim());
+    }
+    return results.slice(0, 6).map((r) => ({
       label: [r.name, r.admin1 && r.admin1 !== r.name ? r.admin1 : null, r.country]
         .filter(Boolean)
         .join(', '),

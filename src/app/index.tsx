@@ -514,9 +514,27 @@ export default function NewTripScreen() {
                   ))}
                 </View>
               ) : cityQuery.trim().length >= 2 && !loadingSuggestions && suggestions.length === 0 && !cityChosen ? (
-                <Text variant="caption" tone="onGlassSecondary" style={{ marginTop: theme.spacing.sm }}>
-                  No cities found — try a different spelling.
-                </Text>
+                // No type-ahead match (e.g. an unusual spelling, or the field was
+                // autofilled to "City, Country"). Always give a way forward: tap
+                // to search the raw text — startFromCityQuery resolves it directly.
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Search ${cityQuery.trim()}`}
+                  onPress={() => {
+                    hapticSelection();
+                    void trip.startFromCityQuery(cityQuery.trim());
+                  }}
+                  style={[
+                    styles.dropdown,
+                    styles.dropdownRow,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+                  ]}
+                >
+                  <IconSymbol name="magnifyingglass" size={13} color={theme.colors.accent} fallbackGlyph="⌕" />
+                  <Text variant="footnote" tone="onGlass" numberOfLines={1} style={{ flex: 1 }}>
+                    Search “{cityQuery.trim()}”
+                  </Text>
+                </Pressable>
               ) : null}
 
               {/* Status row (loading / error / success) */}
