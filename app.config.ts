@@ -20,9 +20,9 @@ const config: ExpoConfig = {
   scheme: 'gnaver',
   userInterfaceStyle: 'automatic',
   ios: {
-    // Apple Icon Composer bundle (iOS 26 Liquid Glass, layered). Editable in
-    // Icon Composer.app. Falls back to the universal icon on older iOS.
-    icon: './assets/Gnaver.icon',
+    // Unified minimalist pin mark (./assets/images/icon.png) — the same logo as
+    // the home screen, loading overlay and splash. Regenerate all brand assets
+    // via `node scripts/gen-brand-assets.mjs`.
     supportsTablet: true,
     bundleIdentifier: 'com.ariomoniri.gnaver',
     infoPlist: {

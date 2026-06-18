@@ -8,6 +8,7 @@ export { Segmented, type SegmentedProps, type SegmentOption } from './Segmented'
 export { Stepper, type StepperProps } from './Stepper';
 export { GlassCard, GlassSurface, type GlassCardProps, type GlassSurfaceProps, type GlassVariant } from './GlassCard';
 export { Card, type CardProps } from './Card';
+export { BrandGlyph, type BrandGlyphProps } from './BrandGlyph';
 export { IconSymbol, type IconSymbolProps } from './IconSymbol';
 export { Screen, type ScreenProps, type NavBarAction } from './Screen';
 export { Divider, type DividerProps } from './Divider';

@@ -1,19 +1,34 @@
 /**
  * Full-screen blocking overlay shown while the optimizer crunches a plan.
- * A glass card with a clean native spinner + status line — crisp at any size,
- * no scaled-up imagery.
+ * A glass card with the Gnaver mark gently breathing + a status line — the same
+ * modern logo used on the app icon and home screen, crisp at any size.
  */
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, Modal, StyleSheet, View } from 'react-native';
+import { Animated, Modal, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 import { GlassCard } from './GlassCard';
+import { BrandGlyph } from './BrandGlyph';
 
-/** A small, crisp inline activity spinner in the brand accent. */
-export function PulsingLogo({ size = 28 }: { size?: number }) {
-  const theme = useTheme();
-  return <ActivityIndicator size={size > 36 ? 'large' : 'small'} color={theme.colors.accent} />;
+/** The Gnaver mark with a gentle, infinite breathing pulse — the brand loader. */
+export function PulsingLogo({ size = 56 }: { size?: number }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.08, duration: 720, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 720, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [scale]);
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <BrandGlyph size={size} />
+    </Animated.View>
+  );
 }
 
 export interface LoadingOverlayProps {
@@ -50,7 +65,7 @@ export function LoadingOverlay({
           }}
         >
           <GlassCard padding="lg" radius="xl" floating style={styles.card}>
-            <ActivityIndicator size="large" color={theme.colors.accent} />
+            <PulsingLogo size={56} />
             <Text variant="headline" align="center" style={{ marginTop: theme.spacing.lg }}>
               {title}
             </Text>

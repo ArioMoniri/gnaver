@@ -40,6 +40,7 @@ import { useTrip } from '@/store/tripStore';
 import { useSettings } from '@/store/settingsStore';
 import {
   ALL_INTERESTS,
+  BrandGlyph,
   Button,
   Chip,
   DayOptionsSheet,
@@ -369,15 +370,7 @@ export default function NewTripScreen() {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <View style={styles.brandRow}>
-              <LinearGradient
-                colors={theme.gradients.brand as unknown as readonly [string, string, string]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.glyph, theme.elevation.card]}
-              >
-                <View pointerEvents="none" style={[styles.glyphSpec, { backgroundColor: theme.colors.glassStroke }]} />
-                <IconSymbol name="map.fill" size={22} color={theme.colors.onAccent} fallbackGlyph="🗺" />
-              </LinearGradient>
+              <BrandGlyph size={48} />
               <Text variant="hero">Gnaver</Text>
             </View>
             <Text variant="callout" tone="secondary" style={{ marginTop: theme.spacing.sm }}>
